@@ -41,7 +41,7 @@
         protectionController,
         ownProtectionController = false,
         protectionData,
-        STREAM_END_THRESHOLD = 0.2,
+        STREAM_END_THRESHOLD = 0.4, //0.2,
         autoPlay = true,
         canPlay = false,
         isStreamSwitchingInProgress = false,
@@ -190,7 +190,7 @@
             if (self.playbackController.isSeeking()) return;
 
             // check if stream end is reached
-            if (e.data.timeToEnd < STREAM_END_THRESHOLD) {
+            if (e.data.timeToEnd < STREAM_END_THRESHOLD && mediaSource) {
                 this.mediaSourceExt.signalEndOfStream(mediaSource);
             }
         },
@@ -257,6 +257,8 @@
             }
 
             if (!nextStream) return;
+            
+            if (!mediaSource) return;
 
             nextStream.activate(mediaSource);
         },

@@ -57,8 +57,19 @@ MediaPlayer.dependencies.FragmentLoader = function () {
 
                     latency = (requestVO.firstByteDate.getTime() - requestVO.requestStartDate.getTime());
                     download = (requestVO.requestEndDate.getTime() - requestVO.firstByteDate.getTime());
-
-                    self.log((succeeded ? "loaded " : "failed ") + requestVO.mediaType + ":" + requestVO.type + ":" + requestVO.startTime + " (" + req.status + ", " + latency + "ms, " + download + "ms)");
+ 
+                     var downloadedBytes = 0;
+                     if ("string" == typeof(request.range)) {
+                         var rangeOffsets = request.range.split("-");
+                         try {
+                             downloadedBytes = parseInt(rangeOffsets[1]) - parseInt(rangeOffsets[0]) + 1;
+                         } catch (err) {
+                             this.log("Problem parsing request range");
+                         }
+                     }
+                    var Throughput = (downloadedBytes * 8 * 1000) / (latency + download);
+                    
+                    self.log((succeeded ? "loaded " : "failed ") + requestVO.mediaType + ":" + "index = " + requestVO.index + ":" + requestVO.type + ":" + requestVO.startTime + " (" + req.status + ", " + latency + "ms, " + download + "ms) Throughput = " + Throughput);
 
                     self.metricsModel.addHttpRequest(
                         request.mediaType,
@@ -81,17 +92,38 @@ MediaPlayer.dependencies.FragmentLoader = function () {
             request.requestStartDate = new Date();
             lastTraceTime = request.requestStartDate;
 
-            req.open("GET", self.requestModifierExt.modifyRequestURL(request.url), true);
-            req.responseType = "arraybuffer";
-            req = self.requestModifierExt.modifyRequestHeader(req);
+			self.log("FragmentLoader.doLoad() XhttpRequest : " + request.url);
+			self.log("XhhtpRequest Range : bytes= " + request.range + " request.index = " + request.index);
+
+			var requestData = {
+				url: (request.url+""), /*clone*/
+				range: (request.range+""), /*clone*/
+				headers: {
+					Range: "bytes="+request.range
+				}
+			};
+			if (!!self.requestModifierExt.modifyRequestData){
+				// VUDU Extension: check if modifyRequestData method is present in extension.
+				self.requestModifierExt.modifyRequestData(requestData);
+			}
+			req.open("GET", self.requestModifierExt.modifyRequestURL(requestData.url), true);
+			req.responseType = "arraybuffer";
+			req = self.requestModifierExt.modifyRequestHeader(req);
 /*
-            req.setRequestHeader("Cache-Control", "no-cache");
-            req.setRequestHeader("Pragma", "no-cache");
-            req.setRequestHeader("If-Modified-Since", "Sat, 1 Jan 2000 00:00:00 GMT");
+                req.setRequestHeader("Cache-Control", "no-cache");
+                req.setRequestHeader("Pragma", "no-cache");
+                req.setRequestHeader("If-Modified-Since", "Sat, 1 Jan 2000 00:00:00 GMT");
 */
-            if (request.range) {
-                req.setRequestHeader("Range", "bytes=" + request.range);
-            }
+/*
+				// VUDU - rather than limiting headers to "range" header use
+				// map of headers (see below) to make request more flexible
+                if (request.range) {
+                    req.setRequestHeader("Range", "bytes=" + request.range);
+                }
+*/
+			for (var key in requestData.headers){
+				req.setRequestHeader(key, requestData.headers[key]);
+			}
 
             req.onprogress = function (event) {
                 var currentTime = new Date();

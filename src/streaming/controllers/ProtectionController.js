@@ -185,7 +185,9 @@ MediaPlayer.dependencies.ProtectionController = function () {
         },
 
         onKeyMessage = function(e) {
+
             if (e.error) {
+				//TODO propogate error to MediaPlayer.
                 this.log(e.error);
                 return;
             }
@@ -223,6 +225,52 @@ MediaPlayer.dependencies.ProtectionController = function () {
                     return;
                 }
             }
+
+			// Allow the protection extension to do the license retreival by whatever means it wants
+			// Response could be sync or async.
+            if (!!this.protectionExt.isCustomProtocol && this.protectionExt.isCustomProtocol(this.keySystem, protData, message))
+            {
+				var handlers = (function(controller){
+					function onSuccess(licenseData){
+						sendEvent(eventData);
+						try {
+							if (controller.protectionModel) {
+								controller.protectionModel.updateKeySession(sessionToken, licenseData);
+							} else {
+								throw new Error("protectionModel destroyed before response received");
+							}
+						} catch (error) {
+							//TODO propogate error to MediaPlayer.
+							controller.log("Error thrown in protectionModel.updateKeySession() :" + error.message);
+						}
+					}
+
+					function onError(msg){
+						sendEvent(eventData, msg);
+					}
+
+
+					return {
+						onSuccess: onSuccess,
+						onError: onError
+					};
+				})(this);
+
+				try {
+					var licenseDataSynchronous = this.protectionExt.processCustomProtocolLicenseRequest(this.keySystem, protData, message, handlers.onSuccess, handlers.onError);
+					if (!!licenseDataSynchronous){
+						// license request handler was able to return data synchronously.
+						handlers.onSuccess(licenseDataSynchronous);
+					}
+				}
+				catch(err){
+					// Custom handler must throw if it knows immediately that it cannot perform the request.
+					handlers.onError(err.message);
+				}
+
+				return;
+			}
+
 
             // All remaining key system scenarios require a request to a remote license server
             var xhr = new XMLHttpRequest(),
@@ -314,7 +362,7 @@ MediaPlayer.dependencies.ProtectionController = function () {
             // Some browsers return initData as Uint8Array (IE), some as ArrayBuffer (Chrome).
             // Convert to ArrayBuffer
             var abInitData = event.data.initData;
-            if (ArrayBuffer.isView(abInitData)) {
+            if (ArrayBuffer.isView !== undefined && ArrayBuffer.isView(abInitData)) {
                 abInitData = abInitData.buffer;
             }
 
@@ -495,8 +543,12 @@ MediaPlayer.dependencies.ProtectionController = function () {
                 // ContentProtection elements are specified at the AdaptationSet level, so the CP for audio
                 // and video will be the same.  Just use one valid MediaInfo object
                 var supportedKS = this.protectionExt.getSupportedKeySystemsFromContentProtection(mediaInfo.contentProtection);
-                if (supportedKS && supportedKS.length > 0) {
-                    selectKeySystem.call(this, supportedKS, true);
+                if (!window.tizen) {
+                   if (supportedKS && supportedKS.length > 0) {
+                      selectKeySystem.call(this, supportedKS, true);
+                   }
+                } else {
+                   this.log("Do not do key system initialization for Samsung Tizen platform");
                 }
 
                 initialized = true;
@@ -548,7 +600,7 @@ MediaPlayer.dependencies.ProtectionController = function () {
          * @instance
          */
         teardown: function() {
-            this.setMediaElement(null);
+
             this.protectionModel.unsubscribe(MediaPlayer.models.ProtectionModel.eventList.ENAME_KEY_MESSAGE, this);
             this.protectionModel.unsubscribe(MediaPlayer.models.ProtectionModel.eventList.ENAME_SERVER_CERTIFICATE_UPDATED, this);
             this.protectionModel.unsubscribe(MediaPlayer.models.ProtectionModel.eventList.ENAME_KEY_ADDED, this);
@@ -561,6 +613,7 @@ MediaPlayer.dependencies.ProtectionController = function () {
             this.keySystem = undefined;
 
             this.protectionModel.teardown();
+            this.setMediaElement(null);
             this.protectionModel = undefined;
         },
 
@@ -580,15 +633,19 @@ MediaPlayer.dependencies.ProtectionController = function () {
         createKeySession: function(initData) {
             var initDataForKS = MediaPlayer.dependencies.protection.CommonEncryption.getPSSHForKeySystem(this.keySystem, initData);
             if (initDataForKS) {
-
-                // Check for duplicate initData
-                var currentInitData = this.protectionModel.getAllInitData();
-                for (var i = 0; i < currentInitData.length; i++) {
-                    if (this.protectionExt.initDataEquals(initDataForKS, currentInitData[i])) {
-                        this.log("Ignoring initData because we have already seen it!");
-                        return;
-                    }
+                if (!window.tizen) {
+                   // Check for duplicate initData
+                   var currentInitData = this.protectionModel.getAllInitData();
+                   for (var i = 0; i < currentInitData.length; i++) {
+                       if (this.protectionExt.initDataEquals(initDataForKS, currentInitData[i])) {
+                           this.log("Ignoring initData because we have already seen it!");
+                           return;
+                       }
+                   }
                 }
+
+                this.log("createKeySession() call protectionModel's createKeySession() with initData");
+
                 try {
                     this.protectionModel.createKeySession(initDataForKS, this.sessionType);
                 } catch (error) {

@@ -49,7 +49,7 @@ MediaPlayer.models.VideoModel = function () {
             }
 
             stalledStreams.push(type);
-
+            
             // Halt playback until nothing is stalled.
             if (stalledStreams.length === 1) {
                 event = document.createEvent('Event');
@@ -90,6 +90,7 @@ MediaPlayer.models.VideoModel = function () {
 
     return {
         system : undefined,
+        log: undefined,
 
         play: function () {
             element.play();
@@ -171,11 +172,11 @@ MediaPlayer.models.VideoModel = function () {
         setVideoContainer: function(value) {
             videoContainer = value;
         },
-        
+
         getTTMLRenderingDiv: function () {
             return TTMLRenderingDiv;
         },
-        
+
         setTTMLRenderingDiv: function (div) {
             TTMLRenderingDiv = div;
             // The styling will allow the captions to match the video window size and position.

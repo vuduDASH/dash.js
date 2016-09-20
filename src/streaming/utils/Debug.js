@@ -34,6 +34,8 @@ MediaPlayer.utils.Debug = function () {
     var logToBrowserConsole = true,
         showLogTimestamp = true,
         showCalleeName = true,
+        showVideoLog = true,
+        showAudioLog = true,
         startTime = new Date().getTime(),
         eventBus;
 
@@ -113,7 +115,14 @@ MediaPlayer.utils.Debug = function () {
             });
 
             if (logToBrowserConsole) {
-                console.log(message);
+               if (this.getMediaType && this.getMediaType()) {
+                  if ((showAudioLog && this.getMediaType() === "audio") ||
+                      (showVideoLog && this.getMediaType() === "video")) {
+                      console.log(message);
+                  }
+               } else {
+                  console.log(message);
+               }
             }
 
             eventBus.dispatchEvent({

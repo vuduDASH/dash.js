@@ -195,10 +195,11 @@ Dash.dependencies.DashHandler = function () {
                 if (seg) {
                     fTime = seg.presentationStartTime - period.start;
                     sDuration = representation.adaptation.period.duration;
-                    this.log(representation.segmentInfoType + ": " + fTime + " / " + sDuration);
+                    //this.log("isMediaFinished() " + representation.segmentInfoType + ": index = " + index + " [" + fTime + "-" + (fTime + seg.duration) + "]" + " / " + sDuration);
                     isFinished = segmentInfoType === "SegmentTimeline" ? false : (fTime >= sDuration);
                 }
             } else {
+                //this.log("isMediaFinished() : index = " + index + " representation.availableSegmentsNumber = " + representation.availableSegmentsNumber);
                 isFinished = true;
             }
 
@@ -708,7 +709,10 @@ Dash.dependencies.DashHandler = function () {
                     frag = segments[i];
                     ft = frag.presentationStartTime;
                     fd = frag.duration;
-                    epsilon = (timeThreshold === undefined || timeThreshold === null) ? fd/2 : timeThreshold;
+
+                    //epsilon = (timeThreshold === undefined || timeThreshold === null) ? fd/2 : timeThreshold;
+                    //[Vudu Eric Li] let epsilon to be half of segment durantion is not right                    
+                    epsilon = (timeThreshold === undefined || timeThreshold === null) ? 0.001 : timeThreshold;
 
                     if ((time + epsilon) >= ft &&
                         (time - epsilon) < (ft + fd)) {
@@ -834,7 +838,7 @@ Dash.dependencies.DashHandler = function () {
 
             requestedTime = time;
 
-            self.log("Getting the request for time: " + time);
+            //self.log("Getting the request for time: " + time);
 
             index = getIndexForSegments.call(self, time, representation, timeThreshold);
             getSegments.call(self, representation);
@@ -846,7 +850,7 @@ Dash.dependencies.DashHandler = function () {
             //self.log("Got segments.");
             //self.log(segments);
             //self.log("Got a list of segments, so dig deeper.");
-            self.log("Index for time " + time + " is " + index);
+            //self.log("Index for time " + time + " is " + index);
 
             finished = !ignoreIsFinished ? isMediaFinished.call(self, representation) : false;
 

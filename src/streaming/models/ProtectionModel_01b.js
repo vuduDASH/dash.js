@@ -74,7 +74,19 @@ MediaPlayer.models.ProtectionModel_01b = function () {
                     switch (event.type) {
 
                         case api.needkey:
-                            var initData = ArrayBuffer.isView(event.initData) ? event.initData.buffer : event.initData;
+                            //var initData = ArrayBuffer.isView(event.initData) ? event.initData.buffer : event.initData;
+                            //Some web browser do not have ArrayBuffer.isView(), such as Tizen
+                            var initData;
+                            if (ArrayBuffer.isView !== undefined) {
+                                initData = ArrayBuffer.isView(event.initData) ? event.initData.buffer : event.initData;
+                            } else {
+                                initData = event.initData.buffer;
+                            }
+                            if (initData && initData.byteLength !== 0) {
+                               self.log("EME api.needkey event return initData.byteLength = " + initData.byteLength);
+                            } else {
+                               self.log("Warning !! EME api.needkey event return empty initData ");
+                            }
                             self.notify(MediaPlayer.models.ProtectionModel.eventList.ENAME_NEED_KEY,
                                 new MediaPlayer.vo.protection.NeedKey(initData, "cenc"));
                             break;
@@ -160,13 +172,24 @@ MediaPlayer.models.ProtectionModel_01b = function () {
                             }
 
                             if (sessionToken) {
-                                var message = ArrayBuffer.isView(event.message) ? event.message.buffer : event.message;
+                                //Some web browser do not have ArrayBuffer.isView(), such as Tizen
+                                var message;
+                                if (ArrayBuffer.isView !== undefined) {
+                                    message = ArrayBuffer.isView(event.message) ? event.message.buffer : event.message;
+                                } else {
+                                    message = event.message.buffer;
+                                }
+                                //var message = ArrayBuffer.isView(event.message) ? event.message.buffer : event.message;
 
                                 // For ClearKey, the spec mandates that you pass this message to the
                                 // addKey method, so we always save it to the token since there is no
                                 // way to tell which key system is in use
                                 sessionToken.keyMessage = message;
-
+                                if (message && message.byteLength !== 0) {
+                                   self.log("EME api.keymessage event return message.byteLength = " + message.byteLength);
+                                } else {
+                                   self.log("Warning !! EME api.keymessage event return empty message ");
+                                }
                                 self.notify(MediaPlayer.models.ProtectionModel.eventList.ENAME_KEY_MESSAGE,
                                     new MediaPlayer.vo.protection.KeyMessage(sessionToken, message, event.defaultURL));
                             } else {
@@ -289,8 +312,15 @@ MediaPlayer.models.ProtectionModel_01b = function () {
                     if (videos && videos.length !== 0) {
                         supportedVideo = []; // Indicates that we have a requested video config
                         for (var videoIdx = 0; videoIdx < videos.length; videoIdx++) {
-                            if (ve.canPlayType(videos[videoIdx].contentType, systemString) !== "") {
-                                supportedVideo.push(videos[videoIdx]);
+                            //[Eric Li] Tizen do not support this canPlayType() with 2 parameters
+                            if (!window.tizen) {
+                                if (ve.canPlayType(videos[videoIdx].contentType, systemString) !== "") {
+                                    supportedVideo.push(videos[videoIdx]);
+                                }
+                            } else {
+                                if (ve.canPlayType(videos[videoIdx].contentType) !== "") {
+                                    supportedVideo.push(videos[videoIdx]);
+                                }
                             }
                         }
                     }
@@ -400,8 +430,13 @@ MediaPlayer.models.ProtectionModel_01b = function () {
         },
 
         closeKeySession: function(sessionToken) {
-            // Send our request to the CDM
-            videoElement[api.cancelKeyRequest](this.keySystem.systemString, sessionToken.sessionID);
+            if (videoElement && sessionToken && sessionToken.sessionID) {
+               // Send our request to the CDM
+               try {
+                   videoElement[api.cancelKeyRequest](this.keySystem.systemString, sessionToken.sessionID);
+               } catch (error) {
+               }
+            }
         },
 
         setServerCertificate: function(/*serverCertificate*/) { /* Not supported */ },

@@ -567,6 +567,9 @@
             if ( typeof eventName === 'undefined' ) {
                 throw new Error( 1130 );
             }
+            /*if ( typeof eventName === "string" && eventName.indexOf("wallclockTimeUpdated") === -1 ) {
+                console.log("notify event : " + eventName);
+            }*/            
             var argsWithEvent = Array.prototype.slice.call( arguments );
             var argsClean = argsWithEvent.slice( 1 );
             if ( this._handlers.hasOwnProperty( eventName ) ) {
@@ -592,7 +595,6 @@
                         if ( config.oneShot ) {
                             toBeDeleted.unshift( i );
                         }
-
                         if ( config.passEvent ) {
                             handler.apply( instance, argsWithEvent );
                         } else {

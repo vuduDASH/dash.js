@@ -31,7 +31,7 @@
 MediaPlayer.dependencies.AbrController = function () {
     "use strict";
 
-    var autoSwitchBitrate = {video: true, audio: true},
+    var autoSwitchBitrate = {video: true, audio: false},
         topQualities = {},
         qualityDict = {},
         confidenceDict = {},
@@ -40,6 +40,8 @@ MediaPlayer.dependencies.AbrController = function () {
         streamProcessorDict={},
         abandonmentStateDict = {},
         abandonmentTimeout,
+        isQaulityChangeCompleted = {video: true, audio: true},
+        isWaitingForQualityChangeCompleted = {video: false, audio: false},
 
         getInternalQuality = function (type, id) {
             var quality;
@@ -210,10 +212,9 @@ MediaPlayer.dependencies.AbrController = function () {
                                 currentQuality = self.getQualityFor(type, self.streamController.getActiveStreamInfo());
 
                             if (newQuality < currentQuality){
-
-                                fragmentModel.abortRequests();
                                 self.setAbandonmentStateFor(type, MediaPlayer.dependencies.AbrController.ABANDON_LOAD);
                                 self.setPlaybackQuality(type, self.streamController.getActiveStreamInfo() , newQuality);
+                                fragmentModel.abortRequests();
                                 schduleController.replaceCanceledRequests(requests);
                                 setupTimeout(type);
                             }
@@ -284,7 +285,34 @@ MediaPlayer.dependencies.AbrController = function () {
         setAutoSwitchBitrate: function (type, value) {
             autoSwitchBitrate[type] = value;
         },
+        
+        setQualityChangeCompleted: function (type, value) {
+            if (type === "video") {
+               isQaulityChangeCompleted[type] = value;
+            }
+        },
+        
+        waitForQualityChangeCompleted: function(type, callback) {
+            var intervalId,
+                CHECK_INTERVAL = 200,
+                
+                checkIsCompleted = function() {
+                    if (!isQaulityChangeCompleted[type]) {
+                        return;
+                    }
+                    clearInterval(intervalId);
+                    callback();
+                };
+                       
+                if (isQaulityChangeCompleted[type]) {
+                   callback();
+                   return;
+                }
 
+                isWaitingForQualityChangeCompleted[type] = true;
+                intervalId = setInterval(checkIsCompleted, CHECK_INTERVAL);
+        },
+                
         getPlaybackQuality: function (streamProcessor) {
             var self = this,
                 type = streamProcessor.getType(),
@@ -293,10 +321,22 @@ MediaPlayer.dependencies.AbrController = function () {
                 oldQuality,
                 rules,
                 confidence,
+                
+                sendQualityChangeEvent = function() {
+                    isWaitingForQualityChangeCompleted[type] = false;
+                    isQaulityChangeCompleted[type] = false;
+                    
+                    setInternalQuality(type, streamId, quality);
+                    //self.log("New quality of " + quality);
+                    setInternalConfidence(type, streamId, confidence);
+                    //self.log("New confidence of " + confidence);
 
+                    self.notify(MediaPlayer.dependencies.AbrController.eventList.ENAME_QUALITY_CHANGED, {mediaType: type, streamInfo: streamProcessor.getStreamInfo(), oldQuality: oldQuality, newQuality: quality});
+                },
+                
                 callback = function(res) {
                     var topQualityIdx = getTopQualityIndex.call(self, type, streamId);
-
+                
                     quality = res.value;
                     confidence = res.confidence;
 
@@ -312,13 +352,10 @@ MediaPlayer.dependencies.AbrController = function () {
                     oldQuality = getInternalQuality.call(this, type, streamId);
 
                     if (quality === oldQuality || (abandonmentStateDict[type].state === MediaPlayer.dependencies.AbrController.ABANDON_LOAD &&  quality > oldQuality)) return;
+ 
+                    if (isWaitingForQualityChangeCompleted[type]) return;
 
-                    setInternalQuality(type, streamId, quality);
-                    //self.log("New quality of " + quality);
-                    setInternalConfidence(type, streamId, confidence);
-                    //self.log("New confidence of " + confidence);
-
-                    self.notify(MediaPlayer.dependencies.AbrController.eventList.ENAME_QUALITY_CHANGED, {mediaType: type, streamInfo: streamProcessor.getStreamInfo(), oldQuality: oldQuality, newQuality: quality});
+                    this.waitForQualityChangeCompleted(type, sendQualityChangeEvent);
                 };
 
             quality = getInternalQuality.call(this, type, streamId);
@@ -337,16 +374,25 @@ MediaPlayer.dependencies.AbrController = function () {
         },
 
         setPlaybackQuality: function (type, streamInfo, newPlaybackQuality) {
-            var id = streamInfo.id,
+            var self = this,
+                id = streamInfo.id,
                 quality = getInternalQuality.call(this, type, id),
-                isInt = newPlaybackQuality !== null && !isNaN(newPlaybackQuality) && (newPlaybackQuality % 1 === 0);
-
+                isInt = newPlaybackQuality !== null && !isNaN(newPlaybackQuality) && (newPlaybackQuality % 1 === 0),
+                
+                sendQualityChangeEvent = function() {
+                   isWaitingForQualityChangeCompleted[type] = false;
+                   if (newPlaybackQuality !== quality && newPlaybackQuality >= 0 && newPlaybackQuality <= getTopQualityIndex.call(self, type, id)) {
+                      isQaulityChangeCompleted[type] = false;
+                      setInternalQuality(type, streamInfo.id, newPlaybackQuality);
+                      self.notify(MediaPlayer.dependencies.AbrController.eventList.ENAME_QUALITY_CHANGED, {mediaType: type, streamInfo: streamInfo, oldQuality: quality, newQuality: newPlaybackQuality});
+                   }
+                };
+                
             if (!isInt) throw "argument is not an integer";
 
-            if (newPlaybackQuality !== quality && newPlaybackQuality >= 0 && newPlaybackQuality <= getTopQualityIndex.call(this, type, id)) {
-                setInternalQuality(type, streamInfo.id, newPlaybackQuality);
-                this.notify(MediaPlayer.dependencies.AbrController.eventList.ENAME_QUALITY_CHANGED, {mediaType: type, streamInfo: streamInfo, oldQuality: quality, newQuality: newPlaybackQuality});
-            }
+            if (isWaitingForQualityChangeCompleted[type]) return;
+
+            this.waitForQualityChangeCompleted(type, sendQualityChangeEvent);
         },
 
         setAbandonmentStateFor: function (type, state) {
@@ -499,7 +545,7 @@ MediaPlayer.dependencies.AbrController = function () {
         getTopQualityIndexFor:getTopQualityIndex,
 
         reset: function() {
-            autoSwitchBitrate = {video: true, audio: true};
+            autoSwitchBitrate = {video: true, audio: false};
             topQualities = {};
             qualityDict = {};
             confidenceDict = {};
@@ -507,6 +553,8 @@ MediaPlayer.dependencies.AbrController = function () {
             abandonmentStateDict = {};
             clearTimeout(abandonmentTimeout);
             abandonmentTimeout = null;
+            isQaulityChangeCompleted = {video: true, audio: true};
+            isWaitingForQualityChangeCompleted = {video: false, audio: false};
         }
     };
 };

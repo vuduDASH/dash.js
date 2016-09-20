@@ -33,16 +33,22 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
 
     var seekTarget = {},
         scheduleController = {},
+        isSeeking = false,
+        VUDU_SEEK_START_TOLERANCE = 0.15, // RIK 20160512 - Moved from magic number.
 
         onPlaybackSeeking = function(e) {
             // TODO this a dirty workaround to call this handler after a handelr from ScheduleController class. That
             // handler calls FragmentModel.cancelPendingRequests(). We should cancel pending requests before we start
             // creating requests for a seeking time.
+            isSeeking = true;
             setTimeout(function() {
                 var time = e.data.seekTime;
-                seekTarget.audio = time;
+                //Vudu Eric, do not let seek event time to update audio seek time, it need be adjusted by video seek time
+                // RIK: audio and video fragments don't always line-up?
+                //seekTarget.audio = time;
                 seekTarget.video = time;
                 seekTarget.fragmentedText=time;
+                isSeeking = false;
             },0);
         };
 
@@ -52,6 +58,7 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
         virtualBuffer: undefined,
         playbackController: undefined,
         textSourceBuffer:undefined,
+        log: undefined,
 
         setup: function() {
             this[MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_SEEKING] = onPlaybackSeeking;
@@ -87,6 +94,19 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
                 range = null,
                 time,
                 request;
+            //Vudu Eric, when the seeking event happened, but still not set the value done yet because of above ugly hack
+            //we do not do anything. because all the generated request is not right for this new seek event.
+            //wait until the set is done.
+            if (isSeeking) {
+                callback(new MediaPlayer.rules.SwitchRequest(null, p));
+                return;
+            }
+
+            if (mediaType === "audio" && seekTarget.video !== undefined && seekTarget.video !== null) {
+                //this.log("Audio need wait video finished their seek operation, then go!!");
+                callback(new MediaPlayer.rules.SwitchRequest(null, p));
+                return;
+            }
 
             time = hasSeekTarget ? st : ((useRejected ? (rejected.startTime) : currentTime));
 
@@ -116,6 +136,20 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
             }
 
             request = this.adapter.getFragmentRequestForTime(streamProcessor, representationInfo, time, {keepIdx: keepIdx});
+            //Vudu Eric, if seek time is too close to a segment's start time, we go to grab previous one,
+            //because there are maybe some time mismatch between SIDX table and the real mp4 segment's start time.
+            //Mistmatch may happen for non-Vudu content, so implement here in generic player, not in VUDU specific module
+            if (request && hasSeekTarget) {
+                if ( (time > request.startTime) && (time - request.startTime < VUDU_SEEK_START_TOLERANCE) ) {
+					var adjustedStartTime = time - VUDU_SEEK_START_TOLERANCE;
+
+					if (adjustedStartTime < 0){
+						adjustedStartTime = 0;
+					}
+
+                    request = this.adapter.getFragmentRequestForTime(streamProcessor, representationInfo, adjustedStartTime, {keepIdx: keepIdx, timeThreshold: 0});
+                }
+            }
 
             if (useRejected && request && request.index !== rejected.index) {
                 request = this.adapter.getFragmentRequestForTime(streamProcessor, representationInfo, rejected.startTime + (rejected.duration / 2) + EPSILON, {keepIdx: keepIdx, timeThreshold: 0});
@@ -131,6 +165,12 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
 
             if (request && hasSeekTarget) {
                 seekTarget[mediaType] = null;
+                //Vudu Eric, adjust audio seek time to the seeked video segment start Time.
+                //because it looks like playback time will be the seeked video segment start Time
+                if(mediaType === "video") {
+                  //this.log("adjust audio seek time from " + time + " to the start of the seeked video segment startTime = " + request.startTime);
+                  seekTarget.audio = request.startTime;
+                }
             }
 
             callback(new MediaPlayer.rules.SwitchRequest(request, p));

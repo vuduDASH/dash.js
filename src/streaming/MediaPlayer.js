@@ -84,7 +84,7 @@ MediaPlayer = function (context) {
         playing = false,
         autoPlay = true,
         scheduleWhilePaused = false,
-        limitBitrateByPortal = true,
+        limitBitrateByPortal = false,
         bufferMax = MediaPlayer.dependencies.BufferController.BUFFER_SIZE_REQUIRED,
         useManifestDateHeaderTimeSource = true,
         UTCTimingSources = [],
@@ -336,7 +336,7 @@ MediaPlayer = function (context) {
     system.injectInto(debug);
     debug.setup();
     system.injectInto(context);
-
+    
     return {
         notifier: undefined,
         debug: undefined,
@@ -701,7 +701,7 @@ MediaPlayer = function (context) {
                 }
             }
 
-            textSourceBuffer.setTextTrack();
+                textSourceBuffer.setTextTrack();
         },
 
         /**
@@ -1413,7 +1413,6 @@ MediaPlayer = function (context) {
          * @method
          */
         convertToTimeCode : convertToTimeCode
-
     };
 };
 
@@ -1520,5 +1519,10 @@ MediaPlayer.events = {
     ERROR: "error",
     LOG: "log",
     AST_IN_FUTURE: "astinfuture",
-    FRAGMENT_DISCARDED: "fragmentdiscarded"
+    FRAGMENT_DISCARDED: "fragmentdiscarded",
+    // VUDU - Propogate metrics info outside player to containing app, for reporting purposes
+    QUALITY_CHANGED:  "qualitychanged",
+    DEBUG_INFO_CHANGED: "debuginfochanged",
+    REPORT_CHUNK_INFO: "reportchunkinfo"
 };
+

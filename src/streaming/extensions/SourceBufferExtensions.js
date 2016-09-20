@@ -35,6 +35,7 @@ MediaPlayer.dependencies.SourceBufferExtensions = function () {
     this.subscribe = undefined;
     this.unsubscribe = undefined;
     this.manifestExt = undefined;
+    this.log = undefined;
 };
 
 MediaPlayer.dependencies.SourceBufferExtensions.prototype = {
@@ -308,6 +309,9 @@ MediaPlayer.dependencies.SourceBufferExtensions.prototype = {
                 }
                 // updating is in progress, we should wait for it to complete before signaling that this operation is done
                 self.waitForUpdateEnd(buffer, function() {
+                    //if (chunk.mediaInfo.type === "video") {
+                       self.log("[", chunk.mediaInfo.type, "] SourceBufferExt chunk appended: index = ", chunk.index, " quality = ", chunk.quality, " bytes = ", chunk.bytes.byteLength, " duration = [", chunk.start, "-", chunk.end, "] : ", chunk.duration);
+                    //}
                     self.notify(MediaPlayer.dependencies.SourceBufferExtensions.eventList.ENAME_SOURCEBUFFER_APPEND_COMPLETED, {buffer: buffer, bytes: bytes});
                 });
             });

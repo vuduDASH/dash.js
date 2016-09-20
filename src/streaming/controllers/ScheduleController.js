@@ -145,9 +145,16 @@ MediaPlayer.dependencies.ScheduleController = function () {
 
             for (i = 0; i < ln; i += 1) {
                 request = canceledRequests[i];
-                time = request.startTime + (request.duration / 2) + EPSILON;
-                request = this.adapter.getFragmentRequestForTime(this.streamProcessor, currentRepresentationInfo, time, {timeThreshold: 0, ignoreIsFinished: true});
-                this.fragmentController.prepareFragmentForLoading(fragmentModel, request);
+                if (request.action !== request.ACTION_COMPLETE ) {
+                   time = request.startTime + (request.duration / 2) + EPSILON;
+                   request = this.adapter.getFragmentRequestForTime(this.streamProcessor, currentRepresentationInfo, time, {timeThreshold: 0, ignoreIsFinished: true});
+                   this.fragmentController.prepareFragmentForLoading(fragmentModel, request);
+                } else {
+                  /*VUDU Eric we need keep the complete request, otherwise it is throwed away silently*/
+                  /* Or we should not put "complete" request into canceled list at all, change at fragmentModel.cancelPendingRequests side too*/
+                   //this.log("Keep the complete request to signal end of stream!!!");
+                   this.fragmentController.prepareFragmentForLoading(fragmentModel, request);
+                }
             }
         },
 
@@ -182,7 +189,7 @@ MediaPlayer.dependencies.ScheduleController = function () {
         validate = function () {
             var now = new Date().getTime(),
                 isEnoughTimeSinceLastValidation = lastValidationTime ? (now - lastValidationTime > fragmentModel.getLoadingTime()) : true;
-
+            
             this.abrController.getPlaybackQuality(this.streamProcessor);
 
             if (!isEnoughTimeSinceLastValidation || isStopped || (this.playbackController.isPaused() && (this.playbackController.getPlayedRanges().length > 0) &&
