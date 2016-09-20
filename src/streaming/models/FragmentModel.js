@@ -55,18 +55,23 @@ MediaPlayer.dependencies.FragmentModel = function () {
         },
 
         getRequestForTime = function(arr, time, threshold) {
-            var lastIdx = arr.length - 1,
-                start = NaN,
+            var start = NaN,
                 end = NaN,
                 req = null,
                 i;
 
             // loop through the executed requests and pick the one for which the playback interval matches the given time
-            for (i = lastIdx; i >= 0; i -=1) {
+            //Vudu Eric, we should look through from begining to end, instead of from end to begining.
+            //because of the threshold, in theory, one timestamp could be trapped into 2 adjacent req.
+            //use the same way as when PlaybackTimeRule generate request from time, it will search from begining to end for sidx table.
+            //This will avoid out of orde append
+            for (i = 0; i < arr.length; i +=1) {
                 req = arr[i];
                 start = req.startTime;
                 end = start + req.duration;
-                threshold = threshold || (req.duration / 2);
+                //threshold = threshold || (req.duration / 2);
+                //VUDU Eric set threshold to duration /2 is not right
+                threshold = threshold || 0.001;
                 if ((!isNaN(start) && !isNaN(end) && ((time + threshold) >= start) && ((time - threshold) < end)) || (isNaN(start) && isNaN(time))) {
                     return req;
                 }
@@ -149,7 +154,9 @@ MediaPlayer.dependencies.FragmentModel = function () {
         },
 
         onBytesRejected = function(e) {
-            var req = this.getRequests({state: MediaPlayer.dependencies.FragmentModel.states.EXECUTED, quality: e.data.quality, time: e.data.start})[0];
+            //Vudu Eric, do not use start timestamp. in theory, because of threshold, start time stamp will trap into 2 adjacent request time range
+            //var req = this.getRequests({state: MediaPlayer.dependencies.FragmentModel.states.EXECUTED, quality: e.data.quality, time: e.data.start})[0];
+            var req = this.getRequests({state: MediaPlayer.dependencies.FragmentModel.states.EXECUTED, quality: e.data.quality, index: e.data.index})[0];
             // if request for an unappropriate quality has not been removed yet, do it now
             if (req) {
                 removeRequest.call(this, executedRequests, req);
@@ -224,7 +231,7 @@ MediaPlayer.dependencies.FragmentModel = function () {
                     // It can take a few moments to get into the buffer
                     if (!inBuffer) {
                         d = new Date();
-                        d.setSeconds(d.getSeconds() - 3);
+                        d.setSeconds(d.getSeconds() - 30);
                         for (var i = 0; i < executedRequests.length; i += 1) {
                             req = executedRequests[i];
 
@@ -351,10 +358,18 @@ MediaPlayer.dependencies.FragmentModel = function () {
             var length = pendingRequests.length;
             for (var i=0;i<length;i++) {
                 var request=pendingRequests[i];
-                if (quality!==undefined && request.quality==quality) {
-                    newPendingRequests.push(request);
+                if (quality === undefined) {
+                  /* Vudu Eric, if no "quality" parameter, it means cancel all the pending request list*/
+                  canceled.push(request);
                 } else {
+                  /* Vudu Eric, only cancel the pending request list for this quality*/
+                  if (request.action !== request.ACTION_COMPLETE && request.quality===quality) {
                     canceled.push(request);
+                  } else {
+                   /* Vudu Eric  the different quality request should be in newPendingRequests
+                      the "complete" action request should be keeped too */
+                    newPendingRequests.push(request);
+                  }
                 }
             }
             pendingRequests = newPendingRequests;

@@ -60,7 +60,8 @@ MediaPlayer.utils.DOMStorage = function () {
         checkInitialBitrate = function() {
             ['video', 'audio'].forEach(function(value) {
                 //first make sure player has not explicitly set a starting bit rate
-                if (this.abrController.getInitialBitrateFor(value) === undefined) {
+                var initialBitrate = this.abrController.getInitialBitrateFor(value);
+                if (initialBitrate === undefined || initialBitrate === MediaPlayer.dependencies.AbrController["DEFAULT_"+value.toUpperCase()+"_BITRATE"]) {
                     //Checks local storage to see if there is valid, non-expired bit rate
                     //hinting from the last play session to use as a starting bit rate. if not,
                     // it uses the default video and audio value in MediaPlayer.dependencies.AbrController
@@ -155,7 +156,7 @@ MediaPlayer.utils.DOMStorage = function () {
             } catch (error) {
                 this.log("Warning: DOMStorage is supported, but cannot be used: " + error.message);
             }
-
+            this.log("check if DOMStorage is supported,  isSupported = " + isSupported);
             return isSupported;
         }
     };

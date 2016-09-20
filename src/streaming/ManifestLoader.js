@@ -177,12 +177,23 @@ MediaPlayer.dependencies.ManifestLoader = function () {
             };
 
             try {
+				var requestData = {
+					url: url,
+					headers: {}
+				};
+
                 //this.log("Start loading manifest: " + url);
                 request.onload = onload;
                 request.onloadend = report;
                 request.onerror = report;
                 request.onprogress = progress;
-                request.open("GET", self.requestModifierExt.modifyRequestURL(url), true);
+
+				if (!!self.requestModifierExt.modifyRequestData) {
+					// VUDU Rik - this method is added to the extension for VUDU, but not present normally, hence, check for existance before call
+					self.requestModifierExt.modifyRequestData(requestData);
+				}
+
+                request.open("GET", self.requestModifierExt.modifyRequestURL(requestData.url), true);
                 request.send();
             } catch (e) {
                 request.onerror();

@@ -85,7 +85,7 @@ MediaPlayer.di.Context = function () {
             this.system.mapSingleton('serverClearKey', MediaPlayer.dependencies.protection.servers.ClearKey);
             this.system.mapSingleton('serverDRMToday', MediaPlayer.dependencies.protection.servers.DRMToday);
 
-            this.system.mapSingleton('requestModifierExt', MediaPlayer.dependencies.RequestModifierExtensions);
+			this.system.mapSingleton('requestModifierExt', MediaPlayer.dependencies.RequestModifierExtensions);
             this.system.mapSingleton('textSourceBuffer', MediaPlayer.dependencies.TextSourceBuffer);
             this.system.mapSingleton('mediaSourceExt', MediaPlayer.dependencies.MediaSourceExtensions);
             this.system.mapSingleton('sourceBufferExt', MediaPlayer.dependencies.SourceBufferExtensions);
@@ -93,6 +93,7 @@ MediaPlayer.di.Context = function () {
             this.system.mapSingleton('errHandler', MediaPlayer.dependencies.ErrorHandler);
             this.system.mapSingleton('videoExt', MediaPlayer.dependencies.VideoModelExtensions);
             this.system.mapSingleton('protectionExt', MediaPlayer.dependencies.ProtectionExtensions);
+            this.system.mapSingleton('mediaControllerExt', MediaPlayer.dependencies.MediaControllerExtension);
             this.system.mapClass('protectionController', MediaPlayer.dependencies.ProtectionController);
             this.system.mapSingleton('playbackController', MediaPlayer.dependencies.PlaybackController);
 

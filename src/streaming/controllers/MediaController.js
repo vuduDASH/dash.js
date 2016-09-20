@@ -86,66 +86,8 @@ MediaPlayer.dependencies.MediaController = function () {
          },
 
          selectInitialTrack = function(tracks) {
-             var mode = this.getSelectionModeForInitialTrack(),
-                 tmpArr = [],
-                 getTracksWithHighestBitrate = function(trackArr) {
-                     var max = 0,
-                         result = [],
-                         tmp;
-
-                     trackArr.forEach(function(track) {
-                         tmp = Math.max.apply(Math, track.bitrateList);
-
-                         if (tmp > max) {
-                             max = tmp;
-                             result = [track];
-                         } else if (tmp === max) {
-                             result.push(track);
-                         }
-                     });
-
-                     return result;
-                 },
-                 getTracksWithWidestRange = function(trackArr) {
-                     var max = 0,
-                         result = [],
-                         tmp;
-
-                     trackArr.forEach(function(track) {
-                         tmp = track.representationCount;
-
-                         if (tmp > max) {
-                             max = tmp;
-                             result = [track];
-                         } else if (tmp === max) {
-                             result.push(track);
-                         }
-                     });
-
-                     return result;
-                 };
-
-             switch (mode) {
-                case MediaPlayer.dependencies.MediaController.trackSelectionModes.HIGHEST_BITRATE:
-                    tmpArr = getTracksWithHighestBitrate(tracks);
-
-                    if (tmpArr.length > 1) {
-                        tmpArr = getTracksWithWidestRange(tmpArr);
-                    }
-                    break;
-                case MediaPlayer.dependencies.MediaController.trackSelectionModes.WIDEST_RANGE:
-                    tmpArr = getTracksWithWidestRange(tracks);
-
-                    if (tmpArr.length > 1) {
-                        tmpArr = getTracksWithHighestBitrate(tracks);
-                    }
-                    break;
-                default:
-                    this.log("track selection mode is not supported: " + mode);
-                    break;
-             }
-
-             return tmpArr[0];
+			// VUDU Rik - Moved code from here to ext to make it easier to customize
+			return this.mediaControllerExt.selectInitialTrack(tracks);
          },
 
          createTrackInfo = function() {
@@ -180,7 +122,8 @@ MediaPlayer.dependencies.MediaController = function () {
         notify: undefined,
         subscribe: undefined,
         unsubscribe: undefined,
-        DOMStorage:undefined,
+        DOMStorage: undefined,
+        mediaControllerExt: undefined,
 
         setup: function() {
             resetInitialSettings.call(this);

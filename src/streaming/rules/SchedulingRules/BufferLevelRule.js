@@ -70,7 +70,8 @@ MediaPlayer.rules.BufferLevelRule = function () {
             } else if (bufferMax === MediaPlayer.dependencies.BufferController.BUFFER_SIZE_INFINITY) {
                 requiredBufferLength = duration;
             } else if (bufferMax === MediaPlayer.dependencies.BufferController.BUFFER_SIZE_REQUIRED) {
-                if (!isDynamic && self.abrController.isPlayingAtTopQuality(scheduleController.streamProcessor.getStreamInfo())) {
+                //Vudu Eric let all quality could be buffred at 30 seconds which is the same as audio, becuase audio is always top quality
+                if (!isDynamic /*&& self.abrController.isPlayingAtTopQuality(scheduleController.streamProcessor.getStreamInfo())*/) {
                     currentBufferTarget = /*isLongFormContent ?
                         MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY_LONG_FORM :*/
                         MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY;
@@ -80,7 +81,7 @@ MediaPlayer.rules.BufferLevelRule = function () {
 
                 var recentLatency = Math.max( Math.max(vLatency,aLatency),MINIMUM_LATENCY_BUFFER);
 
-                requiredBufferLength = currentBufferTarget + recentLatency;
+                requiredBufferLength = currentBufferTarget + recentLatency / 1000;
             }
 
             return Math.min(requiredBufferLength, criticalBufferLevel);
@@ -110,7 +111,7 @@ MediaPlayer.rules.BufferLevelRule = function () {
                 mediaType = mediaInfo.type;
 
             var metrics = this.metricsModel.getReadOnlyMetricsFor(mediaType),
-                switchMode = this.mediaController.getSwitchMode(),
+                switchMode = this.mediaController.getSwitchMode(mediaType),
                 bufferLevel = this.metricsExt.getCurrentBufferLevel(metrics),
                 currentTime = this.playbackController.getTime(),
                 appendedChunks = this.virtualBuffer.getChunks({streamId: streamId, mediaType: mediaType, appended: true, mediaInfo: mediaInfo, forRange: {start: currentTime, end: (currentTime + bufferLevel)}}),

@@ -38,7 +38,8 @@ MediaPlayer.dependencies.BufferController = function () {
         criticalBufferLevel = Number.POSITIVE_INFINITY,
         mediaSource,
         maxAppendedIndex = -1,
-        lastIndex = -1,
+        fragCount = -1,
+        lastFragmentLoaded = -1,
         type,
         buffer = null,
         minBufferTime,
@@ -49,6 +50,8 @@ MediaPlayer.dependencies.BufferController = function () {
 
         isAppendingInProgress = false,
         isPruningInProgress = false,
+        timerScheduledPrune = null,
+
         inbandEventFound = false,
 
         createBuffer = function(mediaInfo) {
@@ -84,7 +87,17 @@ MediaPlayer.dependencies.BufferController = function () {
                 streamId = getStreamId.call(this),
                 mediaData = this.virtualBuffer.getChunks({streamId: streamId, mediaType: type, segmentType: MediaPlayer.vo.metrics.HTTPRequest.MEDIA_SEGMENT_TYPE, quality: currentQuality});
 
-            if ((currentQuality > requiredQuality) && (hasDataForQuality(mediaData, currentQuality) || hasDataForQuality(loadingReqs, currentQuality))) {
+            // Vudu Eric, turn off the Media Reject, wait until all current quality media data is appended and loadingReqs are executed
+            /*if ((currentQuality > requiredQuality) && (hasDataForQuality(mediaData, currentQuality) || hasDataForQuality(loadingReqs, currentQuality))) {
+                return false;
+            }*/
+
+            if(hasDataForQuality(mediaData, currentQuality) || hasDataForQuality(loadingReqs, currentQuality)) {
+                return false;
+            }
+
+            /* Vudu Eric if buffer completed, do not switch quality any more*/
+            if (bufferCompletedSent) {
                 return false;
             }
 
@@ -145,6 +158,19 @@ MediaPlayer.dependencies.BufferController = function () {
 
             this.virtualBuffer.append(chunk);
 
+            this.eventBus.dispatchEvent({
+                type: MediaPlayer.events.REPORT_CHUNK_INFO,
+                mediaType: type,
+                data: {
+                       startDate : request.requestStartDate,
+                       endDate : request.requestEndDate,
+                       index : index,
+                       quality : quality,
+                       duration : chunk.duration,
+                       bytes : bytes.byteLength
+                }
+            });
+
             appendNext.call(this);
         },
 
@@ -165,22 +191,24 @@ MediaPlayer.dependencies.BufferController = function () {
             if ((quality !== requiredQuality && isInit) || (quality !== currentQuality && !isInit)) {
                 self.log('reject request - required quality = ' + requiredQuality +
                                         ' current quality = ' + currentQuality +
-                                        ' chunk media type = ' + chunk.mediaType +
+                                        ' chunk media type = ' + chunk.mediaInfo.type +
                                         ' chunk quality = ' + quality +
                                         ' chunk index = ' + chunk.index);
                 onMediaRejected.call(self, quality, chunk.index, chunk.start);
                 return;
             }
             //self.log("Push bytes: " + data.byteLength);
+
             self.sourceBufferExt.append(buffer, chunk);
         },
 
         onAppended = function(e) {
             if (buffer !== e.data.buffer) return;
 
-            if (this.isBufferingCompleted() && this.streamProcessor.getStreamInfo().isLast) {
-                this.mediaSourceExt.signalEndOfStream(mediaSource);
-            }
+//VUDU Rik - this causes endofstream to be called multiple times (once for each media).
+//          if (this.isBufferingCompleted() && this.streamProcessor.getStreamInfo().isLast) {
+//              this.mediaSourceExt.signalEndOfStream(mediaSource);
+//          }
 
             var self = this,
                 ranges;
@@ -210,7 +238,7 @@ MediaPlayer.dependencies.BufferController = function () {
             ranges = self.sourceBufferExt.getAllRanges(buffer);
 
             if (ranges) {
-                //self.log("Append complete: " + ranges.length);
+                self.log("Append complete: " + ranges.length);
                 if (ranges.length > 0) {
                     var i,
                         len;
@@ -234,8 +262,11 @@ MediaPlayer.dependencies.BufferController = function () {
 
             bufferLevel = self.sourceBufferExt.getBufferLength(buffer, currentTime);
             bufferTarget = fragmentsToLoad > 0 ? (fragmentsToLoad * fragmentDuration) + bufferLevel : bufferTarget;
+            //if (buffer && buffer.buffered)
+            //   self.log("updateBufferLevel() currentTime = " + currentTime + " bufferLevel = " + bufferLevel + " bufferLength = " + buffer.buffered.length);
             addBufferMetrics.call(this);
             self.notify(MediaPlayer.dependencies.BufferController.eventList.ENAME_BUFFER_LEVEL_UPDATED, {bufferLevel: bufferLevel});
+
             checkIfSufficientBuffer.call(self);
 
             return true;
@@ -319,12 +350,76 @@ MediaPlayer.dependencies.BufferController = function () {
             // we want to get rid off buffer that is more than x
             // seconds behind current time, but no pruning once it's
             // finished.
-            if (!isPruningInProgress && mediaSource.readyState !== "ended") {
+            //Vudu Eric, set isPruningInProgress to true, if (end > start) do not meet, sourceBufferExt.remove() will not do the real remove() job
+            // and no onRemove() callback is called, and isPruningInProgress is never set back to false which lead to hang
+            if (!isPruningInProgress && Math.round(start + bufferToPrune) > 0 && mediaSource.readyState !== "ended") {
                 isPruningInProgress = true;
                 this.sourceBufferExt.remove(buffer, 0, Math.round(start + bufferToPrune), mediaSource);
             }
         },
 
+        schedulePruneAhead = function(){
+			if (null !== timerScheduledPrune) return;
+
+			var self = this;
+
+			timerScheduledPrune = setTimeout(function(){
+				timerScheduledPrune = null;
+				pruneBufferAhead.call(self);
+			}, 10);
+		},
+
+        pruneBufferAhead = function(){
+			// VUDU Rik - moved code out of "checkIfBufferingCompleted".
+			/*
+				We were seeing a deadlock due to call from
+				checkIfBufferingCompleted
+					->SourceBufferExt::remove
+						->updateBufferLevel
+							->checkIfSufficentBuffer
+								->isBuferingCompelted
+									->checkIfBufferingCompleted (loop)
+
+				Moved this code here, and set it up so it's called via schedulePruneAhead.
+				Breaks the loop, and allows readyState to be restored to "opened" following
+				a seek from EoF.
+			*/
+			var VUDU_REMOVE_MINIMUM = 2/30; // Don't try remove anything smaller than this.
+
+            try {
+                if (!!isPruningInProgress) return;
+                if (!buffer || !buffer.buffered || buffer.buffered.length === 0) return;
+
+				var currentTime = this.playbackController.getTime();
+				if (0 === currentTime) return;
+
+                var lastRange = buffer.buffered.length - 1;
+                var pruneStart;
+
+				// Prune future buffer if it's discontinuous and a long way away
+				//Vudu Eric Prune future buffer if it is > 40 seconds away no matter it is discontinuous or not
+				for (var i = lastRange; i > 0; i--) {
+					if (currentTime + MediaPlayer.dependencies.BufferController.BUFFER_AHEAD_TO_KEEP < buffer.buffered.end(i)) {
+						pruneStart = buffer.buffered.start(i);
+					} else {
+						break;
+					}
+				}
+				if (pruneStart && pruneStart < currentTime + MediaPlayer.dependencies.BufferController.BUFFER_AHEAD_TO_KEEP) {
+					pruneStart = currentTime + MediaPlayer.dependencies.BufferController.BUFFER_AHEAD_TO_KEEP;
+				}
+
+				//Vudu Eric, set isPruningInProgress to true, if (end > start) do not meet, sourceBufferExt.remove() will not do the real remove() job
+				// and no onRemove() callback is called, and isPruningInProgress is never set back to false which lead to hang
+				// VUDU Rik - Added check for VUDU_REMOVE_MINIMUM, to avoid excessive prune retries.
+				if (pruneStart && (buffer.buffered.end(lastRange) - pruneStart > VUDU_REMOVE_MINIMUM)) {
+					isPruningInProgress = true;
+					this.sourceBufferExt.remove(buffer, pruneStart, buffer.buffered.end(lastRange), mediaSource);
+				}
+            } catch(ex) {
+				this.log("Problem pruning ahead: ", ex.message);
+            }
+		},
 
         getClearRange = function() {
             var self = this,
@@ -343,13 +438,18 @@ MediaPlayer.dependencies.BufferController = function () {
 
             range = self.sourceBufferExt.getBufferRange(buffer, currentTime);
 
-            if ((range === null) && (buffer.buffered.length > 0)) {
-                removeEnd = buffer.buffered.end(buffer.buffered.length -1 );
+            try {
+                if ((range === null) && (buffer.buffered.length > 0)) {
+                   removeEnd = buffer.buffered.end(buffer.buffered.length -1 );
+                }
+
+                removeStart = buffer.buffered.start(0);
+
+                return {start: removeStart, end: removeEnd};
+
+            } catch (ex) {
+              return null;
             }
-
-            removeStart = buffer.buffered.start(0);
-
-            return {start: removeStart, end: removeEnd};
         },
 
         clearBuffer = function(range) {
@@ -379,17 +479,19 @@ MediaPlayer.dependencies.BufferController = function () {
         },
 
         checkIfBufferingCompleted = function() {
-            var TOLERANCE = 0.15,
+            var TOLERANCE = 0.3, //*0.15
                 currentTime = this.playbackController.getTime(),
                 isDynamic = this.playbackController.getIsDynamic(),
-                lastRange,
-                i,
-                pruneStart;
+                lastRange;
 
-            if (!buffer || !buffer.buffered || buffer.buffered.length === 0) {
-                return false;
-            } else {
-                lastRange = buffer.buffered.length - 1;
+            try {
+                if (!buffer || !buffer.buffered || buffer.buffered.length === 0) {
+                    return false;
+                } else {
+                    lastRange = buffer.buffered.length - 1;
+                }
+            } catch(ex) {
+               return false;
             }
 
             if (!isDynamic && buffer.buffered.start(lastRange) <= currentTime && buffer.buffered.end(lastRange) >= this.playbackController.getStreamDuration() - TOLERANCE) {
@@ -398,30 +500,40 @@ MediaPlayer.dependencies.BufferController = function () {
                     this.notify(MediaPlayer.dependencies.BufferController.eventList.ENAME_BUFFERING_COMPLETED);
                 }
                 return true;
-            } else {
-                if (!isPruningInProgress) {
-                    // Prune future buffer if it's discontinuous and a long way away
-                    for (i = lastRange; i > 0; i--) {
-                        if (currentTime + MediaPlayer.dependencies.BufferController.BUFFER_AHEAD_TO_KEEP < buffer.buffered.start(i)) {
-                            pruneStart = buffer.buffered.start(i);
-                        } else {
-                            break;
-                        }
-                    }
-                    if (pruneStart) {
-                        isPruningInProgress = true;
-                        this.sourceBufferExt.remove(buffer, pruneStart, buffer.buffered.end(lastRange), mediaSource);
-                    }
+            } else if (  !isDynamic && (fragCount !== -1) && (lastFragmentLoaded === (fragCount-1))  ) {
+                /* Vudu Rik, if fragCount is set (not -1) it means onStreamCompleted() was called, so we can notify buffering complete.
+                   Vudu do have some movies, where one track can be 1-2 seconds shorter than the duration stated in the Manifest. */
+                if (!bufferCompletedSent) {
+					this.log("Loaded last fragment, triggered BUFFERING_COMPLETED");
+                    bufferCompletedSent = true;
+                    this.notify(MediaPlayer.dependencies.BufferController.eventList.ENAME_BUFFERING_COMPLETED);
                 }
+                return true;
+            } else {
+				// VUDU Rik - moved a bunch of code out of here.  Code is now in "pruneBufferAhead"
+				// FIXME: Not sure it's appropriate to have pruning initiated froma a function called "checkIfBufferingCompleted()", but we need it to happen
+				// quickly after append, to ensure the appropriate buffered range is deleted from memory.
+				//pruneBufferAhead.call(this);
+				schedulePruneAhead.call(this);
                 return false;
             }
         },
 
         checkIfSufficientBuffer = function () {
+
+            //this.log("hasSufficientBuffer = " + hasSufficientBuffer + " bufferLevel = " + bufferLevel + " currentTime = " + this.playbackController.getTime());
             if (bufferLevel < STALL_THRESHOLD && !this.isBufferingCompleted()) {
                 notifyIfSufficientBufferStateChanged.call(this, false);
             } else {
-                notifyIfSufficientBufferStateChanged.call(this, true);
+                if (this.isBufferingCompleted()) {
+                    notifyIfSufficientBufferStateChanged.call(this, true);
+                    return;
+                }
+                //Vudu Eric, after bufferunderrun, only both audio/video accumulate more than 6 seconds (LOW_BUFFER_THRESHOLD + 2), then notify new buffered state
+                if (hasSufficientBuffer === false &&
+                    bufferLevel >= (MediaPlayer.dependencies.BufferController.LOW_BUFFER_THRESHOLD + 2)) {
+                    notifyIfSufficientBufferStateChanged.call(this, true);
+                }
             }
         },
 
@@ -444,6 +556,7 @@ MediaPlayer.dependencies.BufferController = function () {
                     bufferType: type
                 }
             });
+
             this.notify(MediaPlayer.dependencies.BufferController.eventList.ENAME_BUFFER_LEVEL_STATE_CHANGED, {hasSufficientBuffer: state});
             this.log(hasSufficientBuffer ? ("Got enough buffer to start.") : ("Waiting for more buffer before starting playback."));
         },
@@ -457,7 +570,6 @@ MediaPlayer.dependencies.BufferController = function () {
         },
         updateBufferState = function() {
             if (!buffer) return;
-
             var self = this;
             updateBufferLevel.call(self);
             appendNext.call(self);
@@ -485,6 +597,7 @@ MediaPlayer.dependencies.BufferController = function () {
                 level += virtualLevel;
             }
 
+            //this.log("addBufferMetrics() bufferLevel = " + bufferLevel + " virtualLevel = " + virtualLevel + " level = " + level + " BufferState = " + getBufferState());
             this.metricsModel.addBufferLevel(type, new Date(), level * 1000);
         },
 
@@ -512,14 +625,79 @@ MediaPlayer.dependencies.BufferController = function () {
 
         onInitAppended = function(quality) {
             currentQuality = quality;
+            //Move from representationController OnQualityChange() to here
+
+            // VUDU Rik - TODO: building debug string to be done by a util class
+            //call back to VUDU UI to notify new quality only when the new quality's init appended
+            var request = this.streamProcessor.getFragmentModel().getRequests({state: MediaPlayer.dependencies.FragmentModel.states.EXECUTED, quality: quality})[0];
+            var debugInfoString = "";
+            if (type === "video" && request) {
+               if (request.url) {
+                   debugInfoString += request.url + "\n";
+               }
+               if (request.mediaInfo.codec) {
+                  if (request.mediaInfo.codec.indexOf("avc") !== -1) {
+                    debugInfoString += "Video: H.264 ";
+                  } else {
+                    debugInfoString += "Video: H.265 ";
+                  }
+               }
+               debugInfoString += "DASH ";
+               if (request.mediaInfo.representationCount > 4) {
+                  debugInfoString += "V3 ";
+               } else {
+                  debugInfoString += "V2 ";
+               }
+            }
+
+            if (type === "audio" && request) {
+               debugInfoString += " Audio: ";
+               if (request.mediaInfo.codec) {
+                  if (request.mediaInfo.codec.indexOf("mp4a") !== -1) {
+                    debugInfoString += "AAC ";
+                  } else if (request.mediaInfo.codec.indexOf("ec-3") !== -1) {
+                    debugInfoString += "DDP ";
+                  } else {
+                    debugInfoString += "DD ";
+                  }
+               }
+            }
+            
+            this.eventBus.dispatchEvent({
+                type: MediaPlayer.events.QUALITY_CHANGED,
+                data: {
+                       mediaType : type,
+                       quality : quality
+                }
+            });
+            
+            this.eventBus.dispatchEvent({
+                type: MediaPlayer.events.DEBUG_INFO_CHANGED,
+                data: {
+                       mediaType : type,
+                       debugInfo : debugInfoString
+                }
+            });
+            
+            if (this.abrController) {
+               //this.log("onInitAppended(), this time quality switch change is completed");
+               this.abrController.setQualityChangeCompleted(type, true);
+            }
         },
 
         onMediaAppended = function(index) {
+			//this.log("onMediaAppended: ", index);
             this.virtualBuffer.storeAppendedChunk(appendedBytesInfo, buffer);
 
             removeOldTrackData.call(this);
 
-            maxAppendedIndex = Math.max(index,maxAppendedIndex);
+            maxAppendedIndex = Math.max(index, maxAppendedIndex);
+
+            // VUDU Rik - Track most recently added fragment index.  Used in EoS calculation/signalling.
+            lastFragmentLoaded = index;
+
+			//this.log("Fragment count: ", fragCount, " current fragment: ", index);
+
             checkIfBufferingCompleted.call(this);
         },
 
@@ -587,7 +765,16 @@ MediaPlayer.dependencies.BufferController = function () {
 
             if (e.data.fragmentModel !== self.streamProcessor.getFragmentModel()) return;
 
-            lastIndex = e.data.request.index;
+            fragCount = e.data.request.index;
+
+            this.log("onStreamCompleted: FragmentCount: ", fragCount, "; last fragment: ", lastFragmentLoaded);
+
+            this.eventBus.dispatchEvent({
+                type: MediaPlayer.events.REPORT_CHUNK_INFO,
+                mediaType: type,
+                data: null
+            });
+
             checkIfBufferingCompleted.call(self);
         },
 
@@ -609,8 +796,11 @@ MediaPlayer.dependencies.BufferController = function () {
             switchInitData.call(self);
         },
 
-        onChunkAppended = function(/*e*/) {
-            addBufferMetrics.call(this);
+        onChunkAppended = function(e) {
+            var chunk = e.data.chunk;
+            if (chunk.mediaInfo.type === type) {
+               addBufferMetrics.call(this);
+            }
         },
 
         switchInitData = function() {
@@ -655,15 +845,35 @@ MediaPlayer.dependencies.BufferController = function () {
 
         onWallclockTimeUpdated = function(/*e*/) {
             var secondsElapsed;
+            //logBufferedRanges.call(this);
             appendNext.call(this);
             // constantly prune buffer every so often
             wallclockTicked += 1;
             secondsElapsed = (wallclockTicked * (MediaPlayer.dependencies.PlaybackController.WALLCLOCK_TIME_UPDATE_INTERVAL / 1000));
             if ((secondsElapsed >= MediaPlayer.dependencies.BufferController.BUFFER_PRUNING_INTERVAL) && !isAppendingInProgress) {
                 wallclockTicked = 0;
-                pruneBuffer.call(this);
+                try {
+                   pruneBuffer.call(this);
+                } catch (ex) {
+					this.log("Error attempting prunes: ", ex.message);
+                }
             }
         },
+
+        /*logBufferedRanges = function(){
+			var ranges = this.sourceBufferExt.getAllRanges(buffer);
+
+            if ( (!ranges) || (!ranges.length) ) {
+				this.log("No buffered ranges for: ", type);
+			}
+			else {
+				this.log("Buffer Ranges for: ", type);
+
+				for (var i = 0, len = ranges.length; i < len; ++i) {
+					this.log("Buffered Range: ", ranges.start(i), " - ", ranges.end(i));
+                }
+            }
+		},*/
 
         onPlaybackRateChanged = function(/*e*/) {
             checkIfSufficientBuffer.call(this);
@@ -789,7 +999,8 @@ MediaPlayer.dependencies.BufferController = function () {
             hasSufficientBuffer = null;
             minBufferTime = null;
             currentQuality = -1;
-            lastIndex = -1;
+            fragCount = -1;
+            lastFragmentLoaded = -1;
             maxAppendedIndex = -1;
             requiredQuality = 0;
             self.sourceBufferExt.unsubscribe(MediaPlayer.dependencies.SourceBufferExtensions.eventList.ENAME_SOURCEBUFFER_APPEND_COMPLETED, self, onAppended);
@@ -801,6 +1012,7 @@ MediaPlayer.dependencies.BufferController = function () {
 
             isAppendingInProgress = false;
             isPruningInProgress = false;
+            timerScheduledPrune = null;
 
             if (!errored) {
                 self.sourceBufferExt.abort(mediaSource, buffer);
@@ -816,16 +1028,17 @@ MediaPlayer.dependencies.BufferController.BUFFER_SIZE_REQUIRED = "required";
 MediaPlayer.dependencies.BufferController.BUFFER_SIZE_MIN = "min";
 MediaPlayer.dependencies.BufferController.BUFFER_SIZE_INFINITY = "infinity";
 MediaPlayer.dependencies.BufferController.DEFAULT_MIN_BUFFER_TIME = 12;
-MediaPlayer.dependencies.BufferController.LOW_BUFFER_THRESHOLD_MS = 4000;
+MediaPlayer.dependencies.BufferController.LOW_BUFFER_THRESHOLD = 4;
+MediaPlayer.dependencies.BufferController.LOW_BUFFER_THRESHOLD_MS = MediaPlayer.dependencies.BufferController.LOW_BUFFER_THRESHOLD * 1000;
 MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY = 30;
 MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY_LONG_FORM = 300;
 MediaPlayer.dependencies.BufferController.LONG_FORM_CONTENT_DURATION_THRESHOLD = 600;
 MediaPlayer.dependencies.BufferController.RICH_BUFFER_THRESHOLD = 20;
 MediaPlayer.dependencies.BufferController.BUFFER_LOADED = "bufferLoaded";
 MediaPlayer.dependencies.BufferController.BUFFER_EMPTY = "bufferStalled";
-MediaPlayer.dependencies.BufferController.BUFFER_TO_KEEP = 30;
-MediaPlayer.dependencies.BufferController.BUFFER_AHEAD_TO_KEEP = 120;
-MediaPlayer.dependencies.BufferController.BUFFER_PRUNING_INTERVAL = 30;
+MediaPlayer.dependencies.BufferController.BUFFER_TO_KEEP = 20; // do not keep too much buffered data which is early than playback time
+MediaPlayer.dependencies.BufferController.BUFFER_AHEAD_TO_KEEP = 40; //reduce all data which is 40 seconds later than playback time
+MediaPlayer.dependencies.BufferController.BUFFER_PRUNING_INTERVAL = 10; //Vudu Eric prune memory more frequently
 
 
 

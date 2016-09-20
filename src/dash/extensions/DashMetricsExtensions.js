@@ -31,7 +31,7 @@
 Dash.dependencies.DashMetricsExtensions = function () {
     "use strict";
 
-    var PROBABLY_IN_CACHE_MS = 200;
+    var PROBABLY_IN_CACHE_MS = 100;//200;
 
     var findRepresentationIndex = function (period, representationId) {
             var adaptationSet,
@@ -306,7 +306,9 @@ Dash.dependencies.DashMetricsExtensions = function () {
                 // only care about MediaSegments
                 if (response.responsecode && response.type==MediaPlayer.vo.metrics.HTTPRequest.MEDIA_SEGMENT_TYPE) {
                     segmentCount++;
-                    var downloadTime = response.interval;
+                    //Vudu Eric response.interval already include the latency
+                    //var downloadTime = response.interval;
+                    var downloadTime = response._time;
                     var latency = (response.tresponse - response.trequest);
                     // Without a rule specific to latency we should
                     // include both as that is what is actually
@@ -319,7 +321,7 @@ Dash.dependencies.DashMetricsExtensions = function () {
                     // could also use logic about the progress events,
                     // on chrome for example first progress event is
                     // after exactly 32768 bytes
-                    var probalyFromCache = downloadTime<200 && latency<200;
+                    var probalyFromCache = downloadTime<100 && latency<100;
                     if (!probalyFromCache) {
                         interested.push(throughput);
                     }
@@ -331,7 +333,8 @@ Dash.dependencies.DashMetricsExtensions = function () {
                     // this implies all were thought of as in the cache,
                     // just return the last throughput, it's likely to be
                     // higher than any of our manifests
-                    return throughput;
+                    //Vudu Eric need convert it to bit rate per seconds
+                    return throughput * 1000;
                 }
                 return -1;
             }

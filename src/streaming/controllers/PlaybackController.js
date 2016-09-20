@@ -41,6 +41,7 @@ MediaPlayer.dependencies.PlaybackController = function () {
         isDynamic,
         liveDelayFragmentCount = NaN,
         useSuggestedPresentationDelay,
+        playbackStartEventTriggered = false,
 
         getStreamStartTime = function (streamInfo) {
             var presentationStartTime,
@@ -114,7 +115,9 @@ MediaPlayer.dependencies.PlaybackController = function () {
             // if the video model already has a current time.
             var initialSeekTime = getInitialTime.call(this, streamInfo);
             this.log("Starting playback at offset: " + initialSeekTime);
-            this.notify(MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_SEEKING, {seekTime: initialSeekTime});
+            if (initialSeekTime !== getStreamStartTime.call(this, streamInfo)) {
+               this.notify(MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_SEEKING, {seekTime: initialSeekTime});
+            }
         },
 
         updateCurrentTime = function() {
@@ -149,7 +152,7 @@ MediaPlayer.dependencies.PlaybackController = function () {
 
         removeAllListeners = function() {
             if (!videoModel) return;
-
+            
             videoModel.unlisten("canplay", onCanPlay);
             videoModel.unlisten("play", onPlaybackStart);
             videoModel.unlisten("playing", onPlaybackPlaying);
@@ -169,14 +172,16 @@ MediaPlayer.dependencies.PlaybackController = function () {
         },
 
         onPlaybackStart = function() {
-            this.log("<video> play");
+            this.log("<video> play current Time = " + this.getTime());
             updateCurrentTime.call(this);
             startUpdatingWallclockTime.call(this);
+            playbackStartEventTriggered = true;
             this.notify(MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_STARTED, {startTime: this.getTime()});
         },
 
         onPlaybackPlaying = function() {
             this.log("<video> playing");
+            playbackStartEventTriggered = true;
             this.notify(MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_PLAYING, {playingTime: this.getTime()});
         },
 
@@ -186,7 +191,8 @@ MediaPlayer.dependencies.PlaybackController = function () {
         },
 
         onPlaybackSeeking = function() {
-            this.log("<video> seek");
+            this.log("<video> seek to " + this.getTime());
+            playbackStartEventTriggered = false;
             startUpdatingWallclockTime.call(this);
             this.notify(MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_SEEKING, {seekTime: this.getTime()});
         },
@@ -197,9 +203,9 @@ MediaPlayer.dependencies.PlaybackController = function () {
         },
 
         onPlaybackTimeUpdated = function() {
-            //this.log("<video> timeupdate");
-            var time = this.getTime();
 
+            var time = this.getTime();
+            //this.log("<video> timeupdate time = " + time);
             if (time === currentTime) return;
 
             currentTime = time;
@@ -225,7 +231,7 @@ MediaPlayer.dependencies.PlaybackController = function () {
         onPlaybackRateChanged = function() {
             var rate = this.getPlaybackRate();
 
-            this.log("<video> ratechange: ", rate);
+            this.log("<video> ratechange: ", rate + " playbacktime = " + this.getTime());
             this.notify(MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_RATE_CHANGED, {playbackRate: rate});
         },
 
@@ -242,6 +248,7 @@ MediaPlayer.dependencies.PlaybackController = function () {
 
         onPlaybackEnded = function(/*e*/) {
             this.log("<video> ended");
+            playbackStartEventTriggered = false;
             stopUpdatingWallclockTime.call(this);
             this.notify(MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_ENDED);
         },
@@ -320,6 +327,7 @@ MediaPlayer.dependencies.PlaybackController = function () {
             videoModel.listen("ratechange", onPlaybackRateChanged);
             videoModel.listen("loadedmetadata", onPlaybackMetaDataLoaded);
             videoModel.listen("ended", onPlaybackEnded);
+
         };
 
     return {
@@ -365,6 +373,7 @@ MediaPlayer.dependencies.PlaybackController = function () {
             setupVideoModel.call(this);
             isDynamic = streamInfo.manifestInfo.isDynamic;
             liveStartTime = streamInfoValue.start;
+            playbackStartEventTriggered = false;
         },
 
         /**
@@ -388,7 +397,7 @@ MediaPlayer.dependencies.PlaybackController = function () {
         },
 
         isPlaybackStarted: function() {
-            return this.getTime() > 0;
+            return (this.getTime() > 0 && playbackStartEventTriggered);
         },
 
         getStreamId: function() {
@@ -484,6 +493,7 @@ MediaPlayer.dependencies.PlaybackController = function () {
             isDynamic = undefined;
             useSuggestedPresentationDelay = undefined;
             liveDelayFragmentCount = NaN;
+            playbackStartEventTriggered = false;
         }
     };
 };
@@ -509,5 +519,5 @@ MediaPlayer.dependencies.PlaybackController.eventList = {
     ENAME_PLAYBACK_ERROR: "playbackError",
     ENAME_WALLCLOCK_TIME_UPDATED: "wallclockTimeUpdated"
 };
-
-MediaPlayer.dependencies.PlaybackController.WALLCLOCK_TIME_UPDATE_INTERVAL = 100; //This value influences the startup time for live.
+/* Vudu Eric , revert this value back to 1.5.0. the new value is only helpful for live application */
+MediaPlayer.dependencies.PlaybackController.WALLCLOCK_TIME_UPDATE_INTERVAL = 1000; //This value influences the startup time for live.

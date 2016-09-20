@@ -35,6 +35,8 @@ MediaPlayer.dependencies.MediaSourceExtensions = function () {
 MediaPlayer.dependencies.MediaSourceExtensions.prototype = {
     constructor: MediaPlayer.dependencies.MediaSourceExtensions,
 
+    log: undefined,
+
     createMediaSource: function () {
         "use strict";
 
@@ -89,7 +91,7 @@ MediaPlayer.dependencies.MediaSourceExtensions.prototype = {
             if (buffers[i].updating) return;
             if (buffers[i].buffered.length===0) return;
         }
-
+        this.log("MediaSourceExtensions() call MSE API endOfStream()!!!!!!");
         source.endOfStream();
     }
 };

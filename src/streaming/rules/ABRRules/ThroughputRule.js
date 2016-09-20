@@ -39,7 +39,16 @@ MediaPlayer.rules.ThroughputRule = function () {
 
     var AVERAGE_THROUGHPUT_SAMPLE_AMOUNT_LIVE = 2,
         AVERAGE_THROUGHPUT_SAMPLE_AMOUNT_VOD = 3;
-
+        
+    var lastSwitchTime = 0,
+        isStreamCompleted = false,
+        waitToSwitchTime = 2500,
+        lastThroughputCheckTime = 0,
+        waitToThroughputCheckTime = 100,
+        
+        onStreamCompleted = function () {
+           isStreamCompleted = true;
+        };
 
     return {
         log: undefined,
@@ -47,7 +56,11 @@ MediaPlayer.rules.ThroughputRule = function () {
         metricsModel: undefined,
         manifestExt:undefined,
         manifestModel:undefined,
-
+        
+        setup: function() {
+            this[MediaPlayer.dependencies.FragmentController.eventList.ENAME_STREAM_COMPLETED] = onStreamCompleted;
+        },
+        
         execute: function (context, callback) {
             var self = this,
                 mediaInfo = context.getMediaInfo(),
@@ -59,6 +72,19 @@ MediaPlayer.rules.ThroughputRule = function () {
                 isDynamic= streamProcessor.isDynamic(),
                 switchRequest =  new MediaPlayer.rules.SwitchRequest(MediaPlayer.rules.SwitchRequest.prototype.NO_CHANGE, MediaPlayer.rules.SwitchRequest.prototype.WEAK);
 
+            //Vudu Eric, do not let quality change too fast
+            var now = new Date().getTime();
+            if ((now - lastSwitchTime) < waitToSwitchTime || (now - lastThroughputCheckTime) < waitToThroughputCheckTime) {
+                callback(switchRequest);
+                return;
+            }
+            
+            //Vudu Eric once the stream is completed, turn off this rule
+            if (isStreamCompleted === true) {
+                callback(switchRequest);
+                return;
+            }
+            
             if ( (metrics.BufferState.length === 0) || (metrics.BufferLevel.length === 0) ) {
                 callback(switchRequest);
                 return;
@@ -68,6 +94,9 @@ MediaPlayer.rules.ThroughputRule = function () {
                 bufferLevelVO = metrics.BufferLevel[metrics.BufferLevel.length - 1];
 
             var averageThroughput = self.metricsExt.getRecentThroughput(metrics, (isDynamic ? AVERAGE_THROUGHPUT_SAMPLE_AMOUNT_LIVE : AVERAGE_THROUGHPUT_SAMPLE_AMOUNT_VOD));
+            
+            lastThroughputCheckTime = now;
+
             // insufficent data don't recommend
             if (averageThroughput<0) {
                 callback(switchRequest);
@@ -84,8 +113,14 @@ MediaPlayer.rules.ThroughputRule = function () {
 
             if (switchRequest.value !== MediaPlayer.rules.SwitchRequest.prototype.NO_CHANGE && switchRequest.value !== current) {
                 self.log("ThroughputRule requesting switch to index: ", switchRequest.value, "type: ",mediaType, " Priority: ", switchRequest.formatPriority(), "Average throughput", averageThroughput, "kbps");
+                lastSwitchTime = now;
             }
             callback(switchRequest);
+        },
+        
+        reset: function() {
+            lastSwitchTime = 0;
+            lastThroughputCheckTime = 0;
         }
     };
 };

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
  * rights, including patent rights, and no such rights are granted under this license.
@@ -40,19 +40,27 @@ MediaPlayer.rules.InsufficientBufferRule = function () {
      * smaller fragments to decrease download time.
      */
     var bufferStateDict = {},
+        isStreamCompleted = false,
         lastSwitchTime = 0,
-        waitToSwitchTime = 1000,
-
-        setBufferInfo = function (type, state) {
+        waitToSwitchTime = 4000,
+        setBufferInfo = function (type, state, level) {
             bufferStateDict[type] = bufferStateDict[type] || {};
             bufferStateDict[type].state = state;
             if (state === MediaPlayer.dependencies.BufferController.BUFFER_LOADED && !bufferStateDict[type].firstBufferLoadedEvent) {
                 bufferStateDict[type].firstBufferLoadedEvent = true;
             }
+            if (level >= (MediaPlayer.dependencies.BufferController.LOW_BUFFER_THRESHOLD_MS*2) && !bufferStateDict[type].initialLowBufferThresholdReached) {
+                bufferStateDict[type].initialLowBufferThresholdReached = true;
+            }
         },
 
         onPlaybackSeeking = function () {
             bufferStateDict = {};
+            lastSwitchTime = 0;
+        },
+        
+        onStreamCompleted = function () {
+            isStreamCompleted = true;
         };
 
     return {
@@ -62,6 +70,7 @@ MediaPlayer.rules.InsufficientBufferRule = function () {
 
         setup: function() {
             this[MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_SEEKING] = onPlaybackSeeking;
+            this[MediaPlayer.dependencies.FragmentController.eventList.ENAME_STREAM_COMPLETED] = onStreamCompleted;
         },
 
         execute: function (context, callback) {
@@ -71,25 +80,42 @@ MediaPlayer.rules.InsufficientBufferRule = function () {
                 current = context.getCurrentValue(),
                 metrics = self.metricsModel.getReadOnlyMetricsFor(mediaType),
                 lastBufferStateVO = (metrics.BufferState.length > 0) ? metrics.BufferState[metrics.BufferState.length - 1] : null,
+                lastBufferLevelVO = (metrics.BufferLevel.length > 0) ? metrics.BufferLevel[metrics.BufferLevel.length - 1] : null,
                 switchRequest = new MediaPlayer.rules.SwitchRequest(MediaPlayer.rules.SwitchRequest.prototype.NO_CHANGE, MediaPlayer.rules.SwitchRequest.prototype.WEAK);
 
             if (now - lastSwitchTime < waitToSwitchTime ||
-                lastBufferStateVO === null) {
+                lastBufferStateVO === null || lastBufferLevelVO === null) {
                 callback(switchRequest);
                 return;
             }
+            //Vudu Eric once the stream is completed, turn off this rule
+            //it will reach the buffer low level and empty status at the end of movie anyway
+            if (isStreamCompleted === true) {
+                callback(switchRequest);
+                return;
+            }
+            
+            setBufferInfo(mediaType, lastBufferStateVO.state, lastBufferLevelVO.level);
 
-            setBufferInfo(mediaType, lastBufferStateVO.state);
             // After the sessions first buffer loaded event , if we ever have a buffer empty event we want to switch all the way down.
             if (lastBufferStateVO.state === MediaPlayer.dependencies.BufferController.BUFFER_EMPTY && bufferStateDict[mediaType].firstBufferLoadedEvent !== undefined) {
+                //self.log("InsufficientBufferRule BUFFER_EMPTY happened, current quality = " + current);
                 switchRequest = new MediaPlayer.rules.SwitchRequest(0, MediaPlayer.rules.SwitchRequest.prototype.STRONG);
+                bufferStateDict = {};
+            } else if (lastBufferStateVO.state === MediaPlayer.dependencies.BufferController.BUFFER_LOADED && bufferStateDict[mediaType].initialLowBufferThresholdReached !== undefined) {
+              if (lastBufferLevelVO.level < MediaPlayer.dependencies.BufferController.LOW_BUFFER_THRESHOLD_MS) {
+                  //Vudu Eric if buffer level less than LOW_BUFFER_THRESHOLD_MS, we also want to switch all the way down
+                  //self.log("InsufficientBufferRule very low buffer level happened level = " + lastBufferLevelVO.level + " current quality = " + current);
+                  switchRequest = new MediaPlayer.rules.SwitchRequest(0, MediaPlayer.rules.SwitchRequest.prototype.STRONG);
+                  bufferStateDict = {};
+              }
             }
 
             if (switchRequest.value !== MediaPlayer.rules.SwitchRequest.prototype.NO_CHANGE && switchRequest.value !== current) {
                 self.log("InsufficientBufferRule requesting switch to index: ", switchRequest.value, "type: ",mediaType, " Priority: ", switchRequest.formatPriority());
+                lastSwitchTime = now;
             }
 
-            lastSwitchTime = now;
             callback(switchRequest);
         },
 

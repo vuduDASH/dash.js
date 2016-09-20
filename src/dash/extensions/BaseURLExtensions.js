@@ -222,10 +222,14 @@ Dash.dependencies.BaseURLExtensions = function () {
                     } else {
                         self.log("Parsing segments from SIDX.");
                         segments = getSegmentsForSidx.call(self, sidx, info);
+                        //self.log("Total has " + segments.length + " segments in this SIDX");
+                        /*for (var i = 0; i < 20; i++) {
+                          self.log("segments["+i+"] = [" + segments[i].startTime + "-" + (segments[i].startTime + segments[i].duration) + "] duration = " + segments[i].duration);
+                        }*/
                         callback.call(self, segments, representation, type);
                     }
                 }
-            };
+			};
 
             request.onloadend = request.onerror = function () {
                 if (!needFailureReport) return;
@@ -239,12 +243,32 @@ Dash.dependencies.BaseURLExtensions = function () {
             self.log("Perform SIDX load: " + info.url);
         },
 
+        HEADERS = {
+			range: "Range"
+		},
         sendRequest = function(request, info) {
-            request.open("GET", this.requestModifierExt.modifyRequestURL(info.url));
+			var requestData = {
+				url: info.url,
+				headers: {}
+			};
+
+			if (!!info.range){
+				requestData.range = "" + info.range.start + "-" + info.range.end;
+				requestData.headers[HEADERS.range] = "bytes=" + info.range.start + "-" + info.range.end;
+			}
+
+			if (!!this.requestModifierExt.modifyRequestData){
+				// Call to modifyRequestData can update data.url and/or requestData.headers.
+				this.requestModifierExt.modifyRequestData(requestData);
+			}
+
+			request.open("GET", this.requestModifierExt.modifyRequestURL(requestData.url));
             request.responseType = "arraybuffer";
-            request.setRequestHeader("Range", "bytes=" + info.range.start + "-" + info.range.end);
-            request = this.requestModifierExt.modifyRequestHeader(request);
-            request.send(null);
+			for (var key in requestData.headers) {
+				request.setRequestHeader(key, requestData.headers[key]);
+			}
+			request = this.requestModifierExt.modifyRequestHeader(request);
+			request.send(null);
         },
 
         onLoaded = function(segments, representation, type) {

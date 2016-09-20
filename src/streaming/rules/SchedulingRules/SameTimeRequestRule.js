@@ -33,6 +33,9 @@ MediaPlayer.rules.SameTimeRequestRule = function () {
 
     var findClosestToTime = function(fragmentModels, time) {
             var req,
+                firstReq,
+                requestSegs = [],
+                tempReq,
                 r,
                 pendingReqs,
                 i = 0,
@@ -43,17 +46,32 @@ MediaPlayer.rules.SameTimeRequestRule = function () {
             for (i; i < ln; i += 1) {
                 pendingReqs = fragmentModels[i].getRequests({state: MediaPlayer.dependencies.FragmentModel.states.PENDING});
                 sortRequestsByProperty.call(this, pendingReqs, "index");
-
+                firstReq = null;
+                r = null;
+                tempReq = null;
                 for (j = 0, pln = pendingReqs.length; j < pln; j++) {
+                  
+                    if (j === 0) {
+                      firstReq = pendingReqs[j];
+                    }
                     req = pendingReqs[j];
 
                     if ((req.startTime > time) && (!r || req.startTime < r.startTime)) {
                         r = req;
                     }
                 }
+                tempReq = r || firstReq;
+                if (tempReq) {
+                  requestSegs.push(tempReq);
+                }
             }
-            if (r || req) {
-                return [r || req];
+            //Vudu Eric, select this first req/earliest req in pending list whose timestamp is earlier than current time
+            //in our VOD app, and sorted array, first req shoudl be earliest req except init reqeust with NaN index
+            //instead of select the closest time req.
+            //Only select the closest req in pending list whose timestamp is later than current time.
+            //This will avoid out of order append.
+            if (requestSegs.length>0) {
+                return requestSegs;
             }
             return null;
         },
@@ -123,35 +141,46 @@ MediaPlayer.rules.SameTimeRequestRule = function () {
                 wallclockTime = new Date(),
                 reqForCurrentTime,
                 mLength = fragmentModels ? fragmentModels.length : null,
+                freeFragmentModels = [],
                 reqsToExecute = [],
-                loadingLength;
+                loadingLength,
+                i;
 
             if (!fragmentModels || !mLength) {
                 callback(new MediaPlayer.rules.SwitchRequest([], p));
                 return;
             }
-
-            currentTime = playbackController.isPlaybackStarted() ? playbackController.getTime() : playbackController.getStreamStartTime(streamInfo);
-            reqForCurrentTime = getForTime(fragmentModels, currentTime);
-            req = reqForCurrentTime || findClosestToTime(fragmentModels, currentTime) || current;
-
-            if (!req || req.length===0) {
-                callback(new MediaPlayer.rules.SwitchRequest([], p));
-                return;
-            }
-            for (var i=0;i<req.length;i++) {
-                reqsToExecute.push(req[i]);
-            }
-
+            
+            //Vudu Eric, move the loading queue check more early, then we return early without do extra work which will be rejected by this check
             for (i=0;i<mLength;i++) {
                 model = fragmentModels[i];
                 // Should we enforce this here, as opposed to a
                 // loadingLength count rule?
                 loadingLength = model.getRequests({state: MediaPlayer.dependencies.FragmentModel.states.LOADING}).length;
                 if (loadingLength > MediaPlayer.dependencies.ScheduleController.LOADING_REQUEST_THRESHOLD) {
-                    callback(new MediaPlayer.rules.SwitchRequest([], p));
-                    return;
+                    continue;
+                } else {
+                  if (model) {
+                     freeFragmentModels.push(model);
+                  }
                 }
+            }
+            
+            if (!freeFragmentModels || freeFragmentModels.length === 0) {
+                callback(new MediaPlayer.rules.SwitchRequest([], p));
+                return;
+            }
+            
+            currentTime = playbackController.isPlaybackStarted() ? playbackController.getTime() : playbackController.getStreamStartTime(streamInfo);
+            reqForCurrentTime = getForTime(freeFragmentModels, currentTime);
+            req = reqForCurrentTime || findClosestToTime(freeFragmentModels, currentTime) || current;
+
+            if (!req || req.length===0) {
+                callback(new MediaPlayer.rules.SwitchRequest([], p));
+                return;
+            }
+            for (i=0;i<req.length;i++) {
+                reqsToExecute.push(req[i]);
             }
 
             // Should we enforce this here or have a proper can we load it rule?
