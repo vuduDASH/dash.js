@@ -281,10 +281,13 @@ var ControlBar = function (dashjsMediaPlayer) {
             //Bitrate Menu
             if (bitrateListBtn) {
                 destroyBitrateMenu();
+
                 var availableBitrates = {menuType: 'bitrate'};
-                availableBitrates.audio = player.getBitrateInfoListFor("audio");
-                availableBitrates.video = player.getBitrateInfoListFor("video");
+                availableBitrates.audio = player.getBitrateInfoListFor("audio") || [];
+                availableBitrates.video = player.getBitrateInfoListFor("video") || [];
+
                 if (availableBitrates.audio.length > 1 || availableBitrates.video.length > 1) {
+
                     contentFunc = function (element, index) {
                         return isNaN(index) ? " Auto Switch" : Math.floor(element.bitrate / 1000) + " kbps";
                     }
@@ -302,11 +305,11 @@ var ControlBar = function (dashjsMediaPlayer) {
             }
 
             //Track Switch Menu
-
             if (!trackSwitchMenu && trackSwitchBtn) {
                 var availableTracks = {menuType: "track"};
                 availableTracks.audio = player.getTracksFor("audio");
-                availableTracks.video = player.getTracksFor("video");
+                availableTracks.video = player.getTracksFor("video"); // these return empty arrays so no need to cehck for null
+
                 if (availableTracks.audio.length > 1 || availableTracks.video.length > 1) {
                     contentFunc = function (element) {
                         return 'Language: ' + element.lang + ' - Role: ' + element.roles[0];
@@ -337,8 +340,8 @@ var ControlBar = function (dashjsMediaPlayer) {
             switch (menuType) {
                 case 'caption' :
                     el.appendChild(document.createElement("ul"));
-                    el = createMenuContent(el, getMenuContent(menuType, info.arr, contentFunc), 'caption', "captionMenuList");
-                    setMenuItemsState(1, 'captionMenuList'); // Should not be harcoded.  get initial index or state from dash.js - not available yet in dash.js
+                    el = createMenuContent(el, getMenuContent(menuType, info.arr, contentFunc), 'caption', menuType + '-list');
+                    setMenuItemsState(1, menuType + '-list'); // Should not be harcoded.  get initial index or state from dash.js - not available yet in dash.js
                     break;
                 case 'track' :
                 case 'bitrate' :
@@ -373,7 +376,7 @@ var ControlBar = function (dashjsMediaPlayer) {
                 return idx;
 
             } else if (menuType === "bitrate") {
-                return player.getAutoSwitchQualityFor(mediaType) ? 0 : getQualityFor(mediaType);
+                return player.getAutoSwitchQualityFor(mediaType) ? 0 : player.getQualityFor(mediaType);
             }
         },
 
@@ -427,7 +430,7 @@ var ControlBar = function (dashjsMediaPlayer) {
                 var item = document.createElement("li");
                 item.id = name + "Item_" + i;
                 item.index = i;
-                item.type = mediaType;
+                item.mediaType = mediaType;
                 item.name = name;
                 item.selected = false;
                 item.textContent = arr[i];
@@ -492,22 +495,23 @@ var ControlBar = function (dashjsMediaPlayer) {
                     case 'video-bitrate-list':
                     case 'audio-bitrate-list':
                         if (self.index > 0) {
-                            player.setAutoSwitchQualityFor(self.type, false);
-                            player.setQualityFor(self.type, self.index - 1);
+                            if (player.getAutoSwitchQualityFor(self.mediaType)) {
+                                player.setAutoSwitchQualityFor(self.mediaType, false);
+                            }
+                            player.setQualityFor(self.mediaType, self.index - 1);
                         } else {
-                            player.setAutoSwitchQualityFor(self.type, true);
+                            player.setAutoSwitchQualityFor(self.mediaType, true);
                         }
                         break;
-                    case 'caption' :
+                    case 'caption-list' :
                         player.setTextTrack(self.index - 1);
                         break
                     case 'video-track-list' :
                     case 'audio-track-list' :
-                        player.setCurrentTrack(player.getTracksFor(self.type)[self.index]);
+                        player.setCurrentTrack(player.getTracksFor(self.mediaType)[self.index]);
                         break;
                 }
             }
-
         },
 
         handleMenuPositionOnResize = function (e) {
