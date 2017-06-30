@@ -32,6 +32,7 @@ import {HTTPRequest} from './vo/metrics/HTTPRequest';
 import FactoryMaker from '../core/FactoryMaker';
 import MediaPlayerModel from './models/MediaPlayerModel';
 import ErrorHandler from './utils/ErrorHandler.js';
+import Debug from '../core/Debug';
 
 /**
  * @module XHRLoader
@@ -53,6 +54,7 @@ function XHRLoader(cfg) {
     let delayedXhrs;
     let retryTimers;
     let downloadErrorToRequestTypeMap;
+    let log = Debug(context).getInstance().log;
 
     function setup() {
         xhrs = [];
@@ -188,7 +190,21 @@ function XHRLoader(cfg) {
         };
 
         try {
-            const modifiedUrl = requestModifier.modifyRequestURL(request.url);
+            log('[' + request.mediaType + ']' + ' XhttpRequest : ' + request.url);
+            log('[' + request.mediaType + ']' + ' XhhtpRequest Range : bytes= ' + request.range + ' request.index = ' + request.index);
+
+            var requestData = {
+                url: (request.url + ''), /*clone*/
+                range: request.range ? (request.range + '') : null, /*clone*/
+                headers: {
+                    Range: 'bytes=' + request.range
+                }
+            };
+            if (!!requestModifier.modifyRequestData) {
+                // New method proposed by VUDU.  Hence doing existance check to protect legacy implementations that will not have modifyRequestData() method.
+                requestModifier.modifyRequestData(requestData);
+            }
+            const modifiedUrl = requestModifier.modifyRequestURL(requestData.url);
             const verb = request.checkExistenceOnly ? 'HEAD' : 'GET';
 
             xhr.open(verb, modifiedUrl, true);
@@ -197,16 +213,16 @@ function XHRLoader(cfg) {
                 xhr.responseType = request.responseType;
             }
 
-            if (request.range) {
-                xhr.setRequestHeader('Range', 'bytes=' + request.range);
-            }
-
             if (!request.requestStartDate) {
                 request.requestStartDate = requestStartTime;
             }
 
             xhr = requestModifier.modifyRequestHeader(xhr);
 
+            // Add all headers to XHR request.  Both range header pass in here, plus any additional headers created by requestModifier.
+            for (var key in requestData.headers) {
+                xhr.setRequestHeader(key, requestData.headers[key]);
+            }
             xhr.withCredentials = mediaPlayerModel.getXHRWithCredentials();
 
             xhr.onload = onload;

@@ -288,10 +288,24 @@ function SegmentBaseLoader() {
         if (!info.url) {
             return;
         }
+        var requestData = {
+            url: info.url,
+            headers:  {}
+        };
+        if (!!info.range) {
+            requestData.range = '' + info.range.start + '-' + info.range.end;
+            requestData.headers.Range = 'bytes=' + info.range.start + '-' + info.range.end;
+        }
 
-        request.open('GET', requestModifier.modifyRequestURL(info.url));
+        if (!!requestModifier.modifyRequestData) {
+            // Call to modifyRequestData can update data.url and/or requestData.headers.
+            requestModifier.modifyRequestData(requestData);
+        }
+        request.open('GET', requestModifier.modifyRequestURL(requestData.url));
         request.responseType = 'arraybuffer';
-        request.setRequestHeader('Range', 'bytes=' + info.range.start + '-' + info.range.end);
+        for (var key in requestData.headers) {
+            request.setRequestHeader(key, requestData.headers[key]);
+        }
         request = requestModifier.modifyRequestHeader(request);
         request.send(null);
     }
