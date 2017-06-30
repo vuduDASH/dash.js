@@ -104,10 +104,10 @@ function MediaController() {
         }
 
         if (tracks.length === 0) {
-            setTrack(selectInitialTrack(tracksForType));
+            setTrack(this.selectInitialTrack(tracksForType));
         } else {
             if (tracks.length > 1) {
-                setTrack(selectInitialTrack(tracks));
+                setTrack(this.selectInitialTrack(tracks));
             } else {
                 setTrack(tracks[0]);
             }
@@ -464,6 +464,7 @@ function MediaController() {
     instance = {
         initialize: initialize,
         checkInitialMediaSettingsForType: checkInitialMediaSettingsForType,
+        selectInitialTrack: selectInitialTrack,
         addTrack: addTrack,
         getTracksFor: getTracksFor,
         getCurrentTrackFor: getCurrentTrackFor,
