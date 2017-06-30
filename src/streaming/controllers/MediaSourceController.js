@@ -29,10 +29,13 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 import FactoryMaker from '../../core/FactoryMaker';
+import Debug from '../../core/Debug';
 
 function MediaSourceController() {
 
     let instance;
+    let context = this.context;
+    let log = Debug(context).getInstance().log;
 
     function createMediaSource() {
 
@@ -81,7 +84,7 @@ function MediaSourceController() {
             if (buffers[i].updating) return;
             if (buffers[i].buffered.length === 0) return;
         }
-
+        log('MediaSourceController call MSE API endOfStream()!!!!!!');
         source.endOfStream();
     }
 
