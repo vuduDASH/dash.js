@@ -111,7 +111,7 @@ function SegmentBaseLoader() {
         };
 
         sendRequest(request, info);
-        log('Perform init search: ' + info.url);
+        log('Perform init search: ' + info.url + ' Range: ' + info.range.start + '-' + info.range.end);
     }
 
     function loadSegments(representation, type, range, loadingInfo, callback) {
@@ -221,7 +221,7 @@ function SegmentBaseLoader() {
         };
 
         sendRequest(request, info);
-        log('Perform SIDX load: ' + info.url);
+        log('Perform SIDX load: ' + info.url + ' Range: ' + info.range.start + '-' + info.range.end);
     }
 
     function reset() {
