@@ -135,7 +135,7 @@ function DashHandler(config) {
             url = baseURL.url;
             serviceLocation = baseURL.serviceLocation;
 
-            if (destination) {
+            if (destination && (url.indexOf(destination) === -1)) {
                 url += destination;
             }
         }
