@@ -132,7 +132,8 @@ function ProtectionModel_21Jan2015(config) {
             }
             eventBus.trigger(Events.INTERNAL_KEY_SYSTEM_SELECTED);
 
-        }).catch(function () {
+        }).catch(function (evt) {
+            log('Failed calling createMediaKeys: ', evt);
             eventBus.trigger(Events.INTERNAL_KEY_SYSTEM_SELECTED, {error: 'Error selecting keys system (' + keySystemAccess.keySystem.systemString + ')! Could not create MediaKeys -- TODO'});
         });
     }
@@ -387,3 +388,4 @@ function ProtectionModel_21Jan2015(config) {
 
 ProtectionModel_21Jan2015.__dashjs_factory_name = 'ProtectionModel_21Jan2015';
 export default FactoryMaker.getClassFactory(ProtectionModel_21Jan2015);
+

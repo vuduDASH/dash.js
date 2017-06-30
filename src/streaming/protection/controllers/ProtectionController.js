@@ -117,10 +117,13 @@ function ProtectionController(config) {
             // ContentProtection elements are specified at the AdaptationSet level, so the CP for audio
             // and video will be the same.  Just use one valid MediaInfo object
             var supportedKS = protectionKeyController.getSupportedKeySystemsFromContentProtection(mediaInfo.contentProtection);
-            if (supportedKS && supportedKS.length > 0) {
-                selectKeySystem(supportedKS, true);
+            if (!window.tizen) {
+                if (supportedKS && supportedKS.length > 0) {
+                    selectKeySystem(supportedKS, true);
+                }
+            } else {
+                log('Do not do key system initialization for Samsung Tizen platform');
             }
-
             initialized = true;
         }
     }
@@ -141,15 +144,17 @@ function ProtectionController(config) {
     function createKeySession(initData) {
         var initDataForKS = CommonEncryption.getPSSHForKeySystem(keySystem, initData);
         if (initDataForKS) {
-
-            // Check for duplicate initData
-            var currentInitData = protectionModel.getAllInitData();
-            for (var i = 0; i < currentInitData.length; i++) {
-                if (protectionKeyController.initDataEquals(initDataForKS, currentInitData[i])) {
-                    log('DRM: Ignoring initData because we have already seen it!');
-                    return;
+            if (!window.tizen) {
+                // Check for duplicate initData
+                var currentInitData = protectionModel.getAllInitData();
+                for (var i = 0; i < currentInitData.length; i++) {
+                    if (protectionKeyController.initDataEquals(initDataForKS, currentInitData[i])) {
+                        log('DRM: Ignoring initData because we have already seen it!');
+                        return;
+                    }
                 }
             }
+            log('createKeySession() call protectionModel createKeySession() with initData');
             try {
                 protectionModel.createKeySession(initDataForKS, sessionType);
             } catch (error) {
@@ -543,11 +548,11 @@ function ProtectionController(config) {
         // Some browsers return initData as Uint8Array (IE), some as ArrayBuffer (Chrome).
         // Convert to ArrayBuffer
         var abInitData = event.key.initData;
-        if (ArrayBuffer.isView(abInitData)) {
+        if (ArrayBuffer.isView && ArrayBuffer.isView(abInitData)) {
             abInitData = abInitData.buffer;
         }
 
-        log('DRM: initData:', String.fromCharCode.apply(null, new Uint8Array(abInitData)));
+        //log('DRM: initData:', String.fromCharCode.apply(null, new Uint8Array(abInitData)));
 
         var supportedKS = protectionKeyController.getSupportedKeySystems(abInitData, protDataSet);
         if (supportedKS.length === 0) {

@@ -142,12 +142,18 @@ function ProtectionModel_01b(config) {
                 if (videos && videos.length !== 0) {
                     supportedVideo = []; // Indicates that we have a requested video config
                     for (var videoIdx = 0; videoIdx < videos.length; videoIdx++) {
-                        if (ve.canPlayType(videos[videoIdx].contentType, systemString) !== '') {
-                            supportedVideo.push(videos[videoIdx]);
+                        //[Eric Li] Tizen do not support this canPlayType() with 2 parameters
+                        if (!window.tizen) {
+                            if (ve.canPlayType(videos[videoIdx].contentType, systemString) !== '') {
+                                supportedVideo.push(videos[videoIdx]);
+                            }
+                        } else {
+                            if (ve.canPlayType(videos[videoIdx].contentType) !== '') {
+                                supportedVideo.push(videos[videoIdx]);
+                            }
                         }
                     }
                 }
-
                 // No supported audio or video in this configuration OR we have
                 // requested audio or video configuration that is not supported
                 if ((!supportedAudio && !supportedVideo) ||
@@ -250,7 +256,15 @@ function ProtectionModel_01b(config) {
 
     function closeKeySession(sessionToken) {
         // Send our request to the CDM
-        videoElement[api.cancelKeyRequest](keySystem.systemString, sessionToken.sessionID);
+        //videoElement[api.cancelKeyRequest](keySystem.systemString, sessionToken.sessionID);
+        if (videoElement && sessionToken && sessionToken.sessionID) {
+            // Send our request to the CDM
+            try {
+                videoElement[api.cancelKeyRequest](this.keySystem.systemString, sessionToken.sessionID);
+            } catch (error) {
+                log('Error: exception inside closekeySession!!');
+            }
+        }
     }
 
     function setServerCertificate(/*serverCertificate*/) { /* Not supported */ }
@@ -264,7 +278,19 @@ function ProtectionModel_01b(config) {
                 switch (event.type) {
 
                     case api.needkey:
-                        var initData = ArrayBuffer.isView(event.initData) ? event.initData.buffer : event.initData;
+                        //var initData = ArrayBuffer.isView(event.initData) ? event.initData.buffer : event.initData;
+                        //Some web browser do not have ArrayBuffer.isView(), such as Tizen
+                        var initData;
+                        if (ArrayBuffer.isView) {
+                            initData = ArrayBuffer.isView(event.initData) ? event.initData.buffer : event.initData;
+                        } else {
+                            initData = event.initData.buffer;
+                        }
+                        if (initData && initData.byteLength !== 0) {
+                            log('EME api.needkey event return initData.byteLength = ' + initData.byteLength);
+                        } else {
+                            log('Warning !! EME api.needkey event return empty initData ');
+                        }
                         eventBus.trigger(Events.NEED_KEY, {key: new NeedKey(initData, 'cenc')});
                         break;
 
@@ -348,8 +374,19 @@ function ProtectionModel_01b(config) {
                         }
 
                         if (sessionToken) {
-                            var message = ArrayBuffer.isView(event.message) ? event.message.buffer : event.message;
-
+                            //var message = ArrayBuffer.isView(event.message) ? event.message.buffer : event.message;
+                            //Some web browser do not have ArrayBuffer.isView(), such as Tizen
+                            var message;
+                            if (ArrayBuffer.isView !== undefined) {
+                                message = ArrayBuffer.isView(event.message) ? event.message.buffer : event.message;
+                            } else {
+                                message = event.message.buffer;
+                            }
+                            if (message && message.byteLength !== 0) {
+                                log('EME api.keymessage event return message.byteLength = ' + message.byteLength);
+                            } else {
+                                log('Warning !! EME api.keymessage event return empty message ');
+                            }
                             // For ClearKey, the spec mandates that you pass this message to the
                             // addKey method, so we always save it to the token since there is no
                             // way to tell which key system is in use
