@@ -247,7 +247,7 @@ function StreamController() {
         // Sometimes after seeking timeUpdateHandler is called before seekingHandler and a new stream starts
         // from beginning instead of from a chosen position. So we do nothing if the player is in the seeking state
         if (playbackController.isSeeking()) return;
-        if (e.timeToEnd < STREAM_END_THRESHOLD) {
+        if (e.timeToEnd < STREAM_END_THRESHOLD && mediaSource) {
             //This is only used for multiperiod content.
             // The main call to signalEndOfStream is driven by BUFFERING_COMPLETED event
             mediaSourceController.signalEndOfStream(mediaSource);
@@ -764,7 +764,8 @@ function StreamController() {
         }
         videoModel = null;
         if (protectionController) {
-            protectionController.setMediaElement(null);
+            //protectionController.setMediaElement(null);
+            protectionController.reset();
             protectionController = null;
             protectionData = null;
             if (manifestModel.getValue()) {
