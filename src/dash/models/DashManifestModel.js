@@ -432,9 +432,11 @@ function DashManifestModel() {
                 if (initialization.hasOwnProperty('sourceURL')) {
                     representation.initialization = initialization.sourceURL;
                 } else if (initialization.hasOwnProperty('range')) {
+                    representation.initialization = r.BaseURL;
                     representation.range = initialization.range;
                 }
             } else if (r.hasOwnProperty('mimeType') && getIsTextTrack(r.mimeType)) {
+                representation.initialization = r.BaseURL;
                 representation.range = 0;
             }
 
