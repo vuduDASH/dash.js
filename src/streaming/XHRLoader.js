@@ -84,11 +84,31 @@ function XHRLoader(cfg) {
         var lastTraceReceivedCount = 0;
 
         const handleLoaded = function (success) {
+            var latency,
+                download;
+
             needFailureReport = false;
 
             request.requestStartDate = requestStartTime;
             request.requestEndDate = new Date();
             request.firstByteDate = request.firstByteDate || requestStartTime;
+
+            latency = (request.firstByteDate.getTime() - request.requestStartDate.getTime());
+            download = (request.requestEndDate.getTime() - request.firstByteDate.getTime());
+
+            var downloadedBytes = 0;
+            if ('string' === typeof (request.range) && request.range !== 'null') {
+                //FIXME: range should never be a string containing the word 'null'!
+                var rangeOffsets = request.range.split('-');
+                try {
+                    downloadedBytes = parseInt(rangeOffsets[1]) - parseInt(rangeOffsets[0]) + 1;
+                } catch (err) {
+                    log('XHRLoader : Problem parsing request range');
+                }
+            }
+            var Throughput = (downloadedBytes * 8 * 1000) / (latency + download);
+
+            log('[' + request.mediaType + ']', (success ? 'loaded ' : 'failed ') + ':' + 'index = ' + request.index + ':' + request.type + ':' + request.startTime + ' (' + xhr.status + ', ' + latency + 'ms, ' + download + 'ms) Throughput = ' + Throughput);
 
             if (!request.checkExistenceOnly) {
                 metricsModel.addHttpRequest(
