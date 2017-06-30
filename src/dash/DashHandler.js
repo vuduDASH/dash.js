@@ -201,7 +201,7 @@ function DashHandler(config) {
             if (seg) {
                 fTime = seg.presentationStartTime - period.start;
                 sDuration = representation.adaptation.period.duration;
-                log(representation.segmentInfoType + ': ' + fTime + ' / ' + sDuration);
+                //log(representation.segmentInfoType + ': ' + fTime + ' / ' + sDuration);
                 isFinished = segmentInfoType === 'SegmentTimeline' && isDynamic ? false : (fTime >= sDuration);
             }
         } else {
@@ -308,6 +308,7 @@ function DashHandler(config) {
                 }
             }
         }
+        // log('DashHandler::getIndexForSegments - time: ', time, '; idx: ', idx, '; ft: ', ft, '; fd: ', fd, '; epsilon: ', epsilon);
 
         return idx;
     }
@@ -365,7 +366,7 @@ function DashHandler(config) {
 
         if (requestedTime !== time) { // When playing at live edge with 0 delay we may loop back with same time and index until it is available. Reduces verboseness of logs.
             requestedTime = time;
-            log('Getting the request for ' + type + ' time : ' + time);
+            //log('Getting the request for ' + type + ' time : ' + time);
         }
 
         index = getIndexForSegments(time, representation, timeThreshold);
@@ -375,9 +376,9 @@ function DashHandler(config) {
             index = getIndexForSegments(time, representation, timeThreshold);
         }
 
-        if (index > 0) {
-            log('Index for ' + type + ' time ' + time + ' is ' + index );
-        }
+        /*if (index > 0) {
+            //log('Index for ' + type + ' time ' + time + ' is ' + index );
+        }*/
 
         finished = !ignoreIsFinished ? isMediaFinished(representation) : false;
         if (finished) {
@@ -386,7 +387,7 @@ function DashHandler(config) {
             request.index = index;
             request.mediaType = type;
             request.mediaInfo = streamProcessor.getMediaInfo();
-            log('Signal complete.', request);
+            log('[' + type + '] Signal complete.', request);
 
         } else {
             segment = getSegmentByIndex(index, representation);
@@ -420,7 +421,7 @@ function DashHandler(config) {
         requestedTime = null;
         index++;
 
-        log('Getting the next request at index: ' + index);
+        //log('Getting the next request at index: ' + index);
 
         finished = isMediaFinished(representation);
         if (finished) {
@@ -429,7 +430,7 @@ function DashHandler(config) {
             request.index = index;
             request.mediaType = type;
             request.mediaInfo = streamProcessor.getMediaInfo();
-            log('Signal complete.');
+            log('[' + type + '] Signal complete.');
         } else {
             updateSegments(representation);
             segment = getSegmentByIndex(index, representation);
