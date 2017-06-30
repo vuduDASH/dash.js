@@ -459,6 +459,46 @@ function ProtectionController(config) {
                 return;
             }
         }
+        // Allow the protection extension to do the license retreival by whatever means it wants
+        // Response could be sync or async.
+        if (!!protectionKeyController.isCustomProtocol && protectionKeyController.isCustomProtocol(keySystem, protData, message)) {
+            var handlers = (function () {
+                function onSuccess(licenseData) {
+                    sendLicenseRequestCompleteEvent(eventData);
+                    try {
+                        if (protectionModel) {
+                            protectionModel.updateKeySession(sessionToken, licenseData);
+                        } else {
+                            throw new Error('protectionModel destroyed before response received');
+                        }
+                    } catch (error) {
+                        //TODO propogate error to MediaPlayer.
+                        log('Error thrown in protectionModel.updateKeySession() :' + error.message);
+                    }
+                }
+
+                function onError(msg) {
+                    sendLicenseRequestCompleteEvent(eventData, msg);
+                }
+
+                return {
+                    onSuccess: onSuccess,
+                    onError: onError
+                };
+            })();
+
+            try {
+                var licenseDataSynchronous = protectionKeyController.processCustomProtocolLicenseRequest(keySystem, protData, message, handlers.onSuccess, handlers.onError);
+                if (!!licenseDataSynchronous) {
+                    //license request handler was able to return data synchronously.
+                    handlers.onSuccess(licenseDataSynchronous);
+                }
+            } catch (err) {
+                // Custom handler must throw if it knows immediately that it cannot perform the request.
+                handlers.onError(err.message);
+            }
+            return;
+        }
 
         // All remaining key system scenarios require a request to a remote license server
         var xhr = new XMLHttpRequest();
