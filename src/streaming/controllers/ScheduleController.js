@@ -317,8 +317,13 @@ function ScheduleController(config) {
             isFragmentProcessingInProgress = false;
         }
 
-        if (e.error && e.serviceLocation && !isStopped) {
-            replaceRequest(e.request);
+        if (e.error && e.request && !isStopped) {
+            if (replaceRequestArray.indexOf(e.request) === -1) {
+                replaceRequest(e.request);
+            }
+            log('[' + type + ']' + ' re-start scheduler 500ms later because of download error, network maybe is disconnected');
+            isFragmentProcessingInProgress = false;
+            startScheduleTimer(500);
         }
     }
 
