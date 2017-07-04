@@ -374,14 +374,14 @@ function PlaybackController() {
     }
 
     function onPlaybackStart() {
-        log('Native video element event: play');
+        log('Native video element event: play startTime = ' + getTime());
         updateCurrentTime();
         startUpdatingWallclockTime();
         eventBus.trigger(Events.PLAYBACK_STARTED, {startTime: getTime()});
     }
 
     function onPlaybackPlaying() {
-        log('Native video element event: playing');
+        log('Native video element event: playing playingTime = ' + getTime());
         eventBus.trigger(Events.PLAYBACK_PLAYING, {playingTime: getTime()});
     }
 
@@ -392,13 +392,13 @@ function PlaybackController() {
 
     function onPlaybackSeeking() {
         let seekTime = getTime();
-        log('Seeking to: ' + seekTime);
+        log('Native video element seeking to: ' + seekTime);
         startUpdatingWallclockTime();
         eventBus.trigger(Events.PLAYBACK_SEEKING, {seekTime: seekTime});
     }
 
     function onPlaybackSeeked() {
-        log('Native video element event: seeked');
+        log('Native video element event: seeked seekedTime = ' + getTime());
         eventBus.trigger(Events.PLAYBACK_SEEKED);
     }
 
