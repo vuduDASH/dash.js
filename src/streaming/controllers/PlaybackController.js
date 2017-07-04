@@ -415,6 +415,11 @@ function PlaybackController() {
         eventBus.trigger(Events.PLAYBACK_PROGRESS);
     }
 
+    function onPlaybackWaiting() {
+        //log("Native video element event: waiting");
+        eventBus.trigger(Events.PLAYBACK_WAITING);
+    }
+
     function onPlaybackRateChanged() {
         var rate = getPlaybackRate();
         log('Native video element event: ratechange: ', rate);
@@ -477,6 +482,7 @@ function PlaybackController() {
         element.addEventListener('seeked', onPlaybackSeeked);
         element.addEventListener('timeupdate', onPlaybackTimeUpdated);
         element.addEventListener('progress', onPlaybackProgress);
+        element.addEventListener('waiting', onPlaybackWaiting);
         element.addEventListener('ratechange', onPlaybackRateChanged);
         element.addEventListener('loadedmetadata', onPlaybackMetaDataLoaded);
         element.addEventListener('ended', onPlaybackEnded);
@@ -492,6 +498,7 @@ function PlaybackController() {
         element.removeEventListener('seeked', onPlaybackSeeked);
         element.removeEventListener('timeupdate', onPlaybackTimeUpdated);
         element.removeEventListener('progress', onPlaybackProgress);
+        element.removeEventListener('waiting', onPlaybackWaiting);
         element.removeEventListener('ratechange', onPlaybackRateChanged);
         element.removeEventListener('loadedmetadata', onPlaybackMetaDataLoaded);
         element.removeEventListener('ended', onPlaybackEnded);
