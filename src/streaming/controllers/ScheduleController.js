@@ -364,6 +364,8 @@ function ScheduleController(config) {
 
     function onQuotaExceeded(e) {
         if (e.sender.getStreamProcessor() !== streamProcessor) return;
+        // VUDU Rik - append must have failed, so we're not processing.
+        isFragmentProcessingInProgress = false;
         stop();
     }
 
