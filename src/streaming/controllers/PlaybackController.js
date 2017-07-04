@@ -445,9 +445,12 @@ function PlaybackController() {
     function onWallclockTime() {
         eventBus.trigger(Events.WALLCLOCK_TIME_UPDATED, {isDynamic: isDynamic, time: new Date()});
     }
-
-    function onBytesAppended(e) {
-        let ranges = e.bufferedRanges;
+    //Vudu Eric, update earlistTime by the following logic is totally not right
+    //It will trigger unneccasry seek operation and make Vudu app stuck
+    //In Dash1.6.0, it only set commonEarliestTime at the first time appended. i do not know why that firstime appened check logic is gone
+    function onBytesAppended(/*e*/) {
+        return;
+        /*let ranges = e.bufferedRanges;
         if (!ranges || !ranges.length) return;
         let bufferedStart = Math.max(ranges.start(0), streamInfo.start);
         let earliestTime = commonEarliestTime[streamInfo.id] === undefined ? bufferedStart : Math.max(commonEarliestTime[streamInfo.id], bufferedStart);
@@ -455,7 +458,7 @@ function PlaybackController() {
         if (!isDynamic && getStreamStartTime(true) < earliestTime && getTime() < earliestTime) {
             seek(earliestTime);
         }
-        commonEarliestTime[streamInfo.id] = earliestTime;
+        commonEarliestTime[streamInfo.id] = earliestTime;*/
     }
 
     function onBufferLevelStateChanged(e) {
