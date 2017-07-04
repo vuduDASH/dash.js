@@ -175,14 +175,14 @@ function ScheduleController(config) {
         if (initialPlayback) {
             initialPlayback = false;
         }
-        log('Schedule controller starting for ' + type);
+        log('[' + type + ']' + ' Schedule controller starting for ' + type);
     }
 
     function stop() {
         if (isStopped) return;
         isStopped = true;
         clearTimeout(scheduleTimeout);
-        log('Schedule controller stopping for ' + type);
+        log('[' + type + ']' + ' Schedule controller stopping for ' + type);
     }
 
     function schedule() {
@@ -200,7 +200,6 @@ function ScheduleController(config) {
                     lastInitQuality = currentRepresentationInfo.quality;
                     bufferController.switchInitData(streamProcessor.getStreamInfo().id, currentRepresentationInfo.quality);
                 } else {
-
                     const request = nextFragmentRequestRule.execute(streamProcessor, replaceRequestArray.shift());
                     if (request) {
                         fragmentModel.executeRequest(request);
@@ -233,7 +232,7 @@ function ScheduleController(config) {
             if (!mediaController.isCurrentTrack(request.mediaInfo) || mediaPlayerModel.getFastSwitchEnabled() && request.quality < currentRepresentationInfo.quality &&
                 bufferController.getBufferLevel() >= safeBufferLevel && abrController.getAbandonmentStateFor(type) !== AbrController.ABANDON_LOAD) {
                 replaceRequest(request);
-                log('Reloading outdated fragment at index: ', request.index);
+                log('[' + type + ']' + ' Reloading outdated fragment at index: ', request.index);
             } else if (request.quality > currentRepresentationInfo.quality) {
                 //The buffer has better quality it in then what we would request so set append point to end of buffer!!
                 setSeekTarget(playbackController.getTime() + bufferController.getBufferLevel());
@@ -308,7 +307,7 @@ function ScheduleController(config) {
         if (e.fragmentModel !== fragmentModel) return;
         stop();
         isFragmentProcessingInProgress = false;
-        log('Stream is complete');
+        log('[' + type + ']' + ' Stream is complete');
     }
 
     function onFragmentLoadingCompleted(e) {
@@ -358,7 +357,7 @@ function ScheduleController(config) {
 
     function onBufferLevelStateChanged(e) {
         if ((e.sender.getStreamProcessor() === streamProcessor) && e.state === BufferController.BUFFER_EMPTY && !playbackController.isSeeking()) {
-            log('Buffer is empty! Stalling!');
+            log('[' + type + ']' + ' Buffer is empty! Stalling!');
             clearPlayListTraceMetrics(new Date(), PlayListTrace.REBUFFERING_REASON);
         }
     }
