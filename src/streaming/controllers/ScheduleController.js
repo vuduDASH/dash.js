@@ -386,9 +386,9 @@ function ScheduleController(config) {
     }
 
     function onPlaybackSeeking(e) {
-        seekTarget = e.seekTime;
+        setSeekTarget(e.seekTime);
         setTimeToLoadDelay(0);
-
+        log('[' + type + ']' + ' Schedule controller onPlaybackSeeking() seekTarget = ' + seekTarget);
         if (isStopped) {
             start();
         }
@@ -413,10 +413,10 @@ function ScheduleController(config) {
         const currentLiveStart = playbackController.getLiveStartTime();
         const request = adapter.getFragmentRequestForTime(streamProcessor, currentRepresentationInfo, startTime, {ignoreIsFinished: true});
 
-        seekTarget = currentLiveStart;
+        setSeekTarget(currentLiveStart);
         if (isNaN(currentLiveStart) || request.startTime > currentLiveStart) {
             playbackController.setLiveStartTime(request.startTime);
-            seekTarget = request.startTime;
+            setSeekTarget(request.startTime);
         }
 
         metricsModel.updateManifestUpdateInfo(manifestUpdateInfo, {
@@ -438,6 +438,7 @@ function ScheduleController(config) {
 
     function setSeekTarget(value) {
         seekTarget = value;
+        //log('setSeekTarget: ', seekTarget);
     }
 
     function getFragmentModel() {
