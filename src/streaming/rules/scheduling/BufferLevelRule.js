@@ -31,13 +31,16 @@
 import MediaPlayerModel from '../../models/MediaPlayerModel';
 import PlaybackController from '../../controllers/PlaybackController';
 import FactoryMaker from '../../../core/FactoryMaker';
+//import Debug from '../../../core/Debug';
 
 function BufferLevelRule(config) {
 
     const context = this.context;
+    //const log = Debug(context).getInstance().log;
     const dashMetrics = config.dashMetrics;
     const metricsModel = config.metricsModel;
     const textSourceBuffer = config.textSourceBuffer;
+    const adapter = config.adapter;
 
     let mediaPlayerModel,
         playbackController;
@@ -49,7 +52,19 @@ function BufferLevelRule(config) {
 
     function execute(streamProcessor, type, videoTrackPresent) {
         const bufferLevel = dashMetrics.getCurrentBufferLevel(metricsModel.getReadOnlyMetricsFor(type));
-        return bufferLevel < getBufferTarget(streamProcessor, type, videoTrackPresent);
+        const bufferTarget = getBufferTarget(streamProcessor, type, videoTrackPresent);
+        let extraFragSpace = 0;
+        if ( ('audio' === type) || ('video' === type) ) {
+            let representationInfo = streamProcessor.getCurrentRepresentationInfo();
+            let time = adapter.getIndexHandlerTime(streamProcessor);
+            let req = adapter.getFragmentRequestForTime(streamProcessor, representationInfo, time);
+            if (!!req) {
+                extraFragSpace = req.duration;
+            }
+        }
+
+        //log('[' + type + '] ' + 'BufferLevelRule bufferLevel = ' + bufferLevel + ' bufferTarget = ' + bufferTarget + ' currentTime = ' + playbackController.getTime());
+        return (bufferLevel + extraFragSpace) < bufferTarget;
     }
 
     function getBufferTarget(streamProcessor, type, videoTrackPresent) {
@@ -58,17 +73,19 @@ function BufferLevelRule(config) {
         if (type === 'fragmentedText') {
             bufferTarget = textSourceBuffer.getAllTracksAreDisabled() ? 0 : representationInfo.fragmentDuration;
         } else if (type === 'audio' && videoTrackPresent) {
-            const videoBufferLevel = dashMetrics.getCurrentBufferLevel(metricsModel.getReadOnlyMetricsFor('video'));
-            bufferTarget = Math.floor(Math.max(videoBufferLevel, representationInfo.fragmentDuration));
+            //const videoBufferLevel = dashMetrics.getCurrentBufferLevel(metricsModel.getReadOnlyMetricsFor('video'));
+            //bufferTarget = Math.floor(Math.max(videoBufferLevel, representationInfo.fragmentDuration));
+            bufferTarget = mediaPlayerModel.getBufferTimeAtTopQuality();
         } else {
-            const streamInfo = representationInfo.mediaInfo.streamInfo;
+            /*const streamInfo = representationInfo.mediaInfo.streamInfo;
             const abrController = streamProcessor.getABRController();
             if (abrController.isPlayingAtTopQuality(streamInfo)) {
                 const isLongFormContent = streamInfo.manifestInfo.duration >= mediaPlayerModel.getLongFormContentDurationThreshold();
                 bufferTarget = isLongFormContent ? mediaPlayerModel.getBufferTimeAtTopQualityLongForm() : mediaPlayerModel.getBufferTimeAtTopQuality();
             }else {
                 bufferTarget = mediaPlayerModel.getStableBufferTime();
-            }
+            }*/
+            bufferTarget = mediaPlayerModel.getBufferTimeAtTopQuality();
         }
 
         return bufferTarget;
