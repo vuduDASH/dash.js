@@ -213,6 +213,14 @@ function BufferController(config) {
 
     function appendToBuffer(chunk) {
         isAppendingInProgress = true;
+        //Vudu Eric only for Tizen 2.x platform which use webkit2 as browser engine for 2016 TV
+        //if we append 2 Init segment side by side, insert an abort() call between them
+        if (appendedBytesInfo && isNaN(appendedBytesInfo.index) && isNaN(chunk.index)) {
+            //if (navigator.userAgent.indexOf('Tizen 2.2') !== -1 || navigator.userAgent.indexOf('Tizen 2.4') !== -1) {
+            //sourceBufferController.abort(mediaSource, buffer);
+            log('[' + type + '] Warning Append 2 init segment side by side!!');
+            //}
+        }
         appendedBytesInfo = chunk;
         sourceBufferController.append(buffer, chunk);
 
