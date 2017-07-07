@@ -185,6 +185,12 @@ class MediaPlayerEvents extends EventsBase {
          */
         this.PLAYBACK_PROGRESS = 'playbackProgress';
         /**
+         * Sent when the requested operation (such as playback) is delayed pending
+         * the completion of another operation (such as a seek).
+         * @event MediaPlayerEvents#PLAYBACK_WAITING
+         */
+        this.PLAYBACK_WAITING = 'playbackWaiting';
+        /**
          * Sent when the playback speed changes.
          * @event MediaPlayerEvents#PLAYBACK_RATE_CHANGED
          */
