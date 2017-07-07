@@ -211,6 +211,12 @@ class MediaPlayerEvents extends EventsBase {
          * @event MediaPlayerEvents#PLAYBACK_TIME_UPDATED
          */
         this.PLAYBACK_TIME_UPDATED = 'playbackTimeUpdated';
+        /**
+         * This is a customized event for report Fragment statistic.
+         * Some informatin is need but not in Metric Info, so add here
+         * @event MediaPlayerEvents#REPORT_DOWNLOADED_FRAGMENT_STAT
+         */
+        this.REPORT_DOWNLOADED_FRAGMENT_STAT = 'reportDownloadedFragmentStat';
     }
 }
 

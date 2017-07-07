@@ -189,6 +189,25 @@ function BufferController(config) {
 
         chunk.bytes = deleteInbandEvents(bytes);
         appendToBuffer(chunk);
+
+        const request = streamProcessor.getFragmentModel().getRequests({
+            state: FragmentModel.FRAGMENT_MODEL_EXECUTED,
+            quality: quality,
+            index: chunk.index
+        })[0];
+        eventBus.trigger(Events.REPORT_DOWNLOADED_FRAGMENT_STAT,
+            {
+                mediaType: type,
+                data: {
+                    startDate: request.requestStartDate,
+                    endDate: request.requestEndDate,
+                    index: chunk.index,
+                    quality: chunk.quality,
+                    duration: chunk.duration,
+                    bytes: chunk.bytes.byteLength
+                }
+            }
+        );
     }
 
 
@@ -436,6 +455,7 @@ function BufferController(config) {
         lastIndex = e.request.index;
 
         log('[',type,'] streamCompleted at index: ', lastIndex);
+        eventBus.trigger(Events.REPORT_DOWNLOADED_FRAGMENT_STAT, {mediaType: type, data: null});
 
         checkIfBufferingCompleted();
     }
