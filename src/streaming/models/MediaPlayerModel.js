@@ -40,7 +40,10 @@ const DEFAULT_LOCAL_STORAGE_MEDIA_SETTINGS_EXPIRATION = 360000;
 const BANDWIDTH_SAFETY_FACTOR = 0.9;
 const ABANDON_LOAD_TIMEOUT = 10000;
 
+const BUFFER_CRITICAL_DEFAULT_LEVEL = Number.POSITIVE_INFINITY;
+const BUFFER_CRITICAL_MINIMUM_LEVEL = 0;
 const BUFFER_TO_KEEP = 30;
+const BUFFER_AHEAD_TO_KEEP = 80; //must be larger than BUFFER_TIME_AT_TOP_QUALITY & BUFFER_TIME_AT_TOP_QUALITY_LONG_FORM
 const BUFFER_PRUNING_INTERVAL = 30;
 const DEFAULT_MIN_BUFFER_TIME = 12;
 const DEFAULT_MIN_BUFFER_TIME_FAST_SWITCH = 20;
@@ -73,7 +76,10 @@ function MediaPlayerModel() {
         liveDelay,
         scheduleWhilePaused,
         bufferToKeep,
+        bufferAheadToKeep,
         bufferPruningInterval,
+        criticalBufferDefaultLevel,
+        criticalBufferMinLevel,
         lastBitrateCachingInfo,
         lastMediaSettingsCachingInfo,
         stableBufferTime,
@@ -101,7 +107,10 @@ function MediaPlayerModel() {
         lastMediaSettingsCachingInfo = {enabled: true , ttl: DEFAULT_LOCAL_STORAGE_MEDIA_SETTINGS_EXPIRATION};
         liveDelayFragmentCount = LIVE_DELAY_FRAGMENT_COUNT;
         liveDelay = undefined; // Explicitly state that default is undefined
+        criticalBufferDefaultLevel = BUFFER_CRITICAL_DEFAULT_LEVEL;
+        criticalBufferMinLevel = BUFFER_CRITICAL_MINIMUM_LEVEL;
         bufferToKeep = BUFFER_TO_KEEP;
+        bufferAheadToKeep = BUFFER_AHEAD_TO_KEEP;
         bufferPruningInterval = BUFFER_PRUNING_INTERVAL;
         stableBufferTime = NaN;
         bufferTimeAtTopQuality = BUFFER_TIME_AT_TOP_QUALITY;
@@ -207,6 +216,30 @@ function MediaPlayerModel() {
 
     function getBufferToKeep() {
         return bufferToKeep;
+    }
+
+    function setBufferAheadToKeep(value) {
+        bufferAheadToKeep = value;
+    }
+
+    function getBufferAheadToKeep() {
+        return bufferAheadToKeep;
+    }
+
+    function getCriticalBufferDefault() {
+        return criticalBufferDefaultLevel;
+    }
+
+    function setCriticalBufferDefault(value) {
+        criticalBufferDefaultLevel = value;
+    }
+
+    function getCriticalBufferMinimum() {
+        return criticalBufferMinLevel;
+    }
+
+    function setCriticalBufferMinimum(value) {
+        criticalBufferMinLevel = value;
     }
 
     function setLastBitrateCachingInfo(enable, ttl) {
@@ -371,6 +404,12 @@ function MediaPlayerModel() {
         getRichBufferThreshold: getRichBufferThreshold,
         setBufferToKeep: setBufferToKeep,
         getBufferToKeep: getBufferToKeep,
+        setBufferAheadToKeep: setBufferAheadToKeep,
+        getBufferAheadToKeep: getBufferAheadToKeep,
+        setCriticalBufferDefault: setCriticalBufferDefault,
+        getCriticalBufferDefault: getCriticalBufferDefault,
+        setCriticalBufferMinimum: setCriticalBufferMinimum,
+        getCriticalBufferMinimum: getCriticalBufferMinimum,
         setBufferPruningInterval: setBufferPruningInterval,
         getBufferPruningInterval: getBufferPruningInterval,
         setFragmentRetryAttempts: setFragmentRetryAttempts,
