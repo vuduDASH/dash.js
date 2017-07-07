@@ -1404,6 +1404,44 @@ function MediaPlayer() {
 
     /**
      * This value influences the buffer pruning logic.
+     * Allows you to modify the buffer that is kept in source buffer in seconds.
+     *  0|--------|currentTime|-----bufferAheadToKeep----|----bufferToPrune-----------|end|
+     *
+     * @default 40 seconds
+     * @param {int} value
+     * @memberof module:MediaPlayer
+     * @instance
+     */
+    function setBufferAheadToKeep(value) {
+        mediaPlayerModel.setBufferAheadToKeep(value);
+    }
+
+    /**
+     * This initializes the level at which player will consider buffer to be critically full
+     *
+     * @default POSITIVE_INFINTY
+     * @param {int} value
+     * @memberof module:MediaPlayer
+     * @instance
+     */
+    function setCriticalBufferDefault(value) {
+        mediaPlayerModel.setCriticalBufferDefault(value);
+    }
+
+    /**
+     * This sets the minimum guard for that the critical buffer level can go down to.
+     *
+     * @default zero (0)
+     * @param {int} value
+     * @memberof module:MediaPlayer
+     * @instance
+     */
+    function setCriticalBufferMinimum(value) {
+        mediaPlayerModel.setCriticalBufferMinimum(value);
+    }
+
+    /**
+     * This value influences the buffer pruning logic.
      * Allows you to modify the interval of pruning buffer in seconds.
      *
      * @default 30 seconds
@@ -2020,6 +2058,9 @@ function MediaPlayer() {
         clearDefaultUTCTimingSources: clearDefaultUTCTimingSources,
         restoreDefaultUTCTimingSources: restoreDefaultUTCTimingSources,
         setBufferToKeep: setBufferToKeep,
+        setBufferAheadToKeep: setBufferAheadToKeep,
+        setCriticalBufferDefault: setCriticalBufferDefault,
+        setCriticalBufferMinimum: setCriticalBufferMinimum,
         setBufferPruningInterval: setBufferPruningInterval,
         setStableBufferTime: setStableBufferTime,
         setBufferTimeAtTopQuality: setBufferTimeAtTopQuality,
