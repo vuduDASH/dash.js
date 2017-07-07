@@ -54,6 +54,25 @@ function FragmentModel(config) {
         loadingRequests,
         fragmentLoader;
 
+    /*function showRequestList(type, arr, listname) {
+        var arrLog = '';
+        for (var i = 0; i < arr.length; i += 1) {
+            arrLog += '[' + arr[i].quality + ',' + arr[i].index + ']';
+        }
+        if (arrLog !== '')
+            log('[' + type + '] ' + listname + ':' + arrLog);
+    }
+
+    function showAllRequestLists(logString) {
+        var type = 'unknown';
+        if (scheduleController) {
+            type = scheduleController.getStreamProcessor().getType();
+            log('[' + type + '] ' + logString);
+            showRequestList(type, loadingRequests, 'loadingRequests');
+            showRequestList(type, executedRequests, 'executedRequests');
+        }
+    }*/
+
     function setup() {
         scheduleController = null;
         fragmentLoader = null;
@@ -129,11 +148,13 @@ function FragmentModel(config) {
 
     function removeExecutedRequestsBeforeTime(time) {
         executedRequests = executedRequests.filter( req => isNaN(req.startTime) || req.startTime >= time );
+        //showAllRequestLists('FragmentModel after removeExecutedRequestsBeforeTime(' + time + ')');
     }
 
     function abortRequests() {
         fragmentLoader.abort();
         loadingRequests = [];
+        //showAllRequestLists('FragmentModel after abortRequests()');
     }
 
     function executeRequest(request) {
@@ -152,6 +173,7 @@ function FragmentModel(config) {
             default:
                 log('Unknown request action.');
         }
+        //showAllRequestLists('FragmentModel after executeRequest()');
     }
 
     function loadCurrentFragment(request) {
@@ -232,6 +254,8 @@ function FragmentModel(config) {
         }
 
         addSchedulingInfoMetrics(e.request, e.error ? FRAGMENT_MODEL_FAILED : FRAGMENT_MODEL_EXECUTED);
+
+        //showAllRequestLists('FragmentModel after onLoadingCompleted()');
 
         eventBus.trigger(Events.FRAGMENT_LOADING_COMPLETED, {
             request: e.request,
