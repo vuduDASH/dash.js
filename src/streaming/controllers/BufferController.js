@@ -152,7 +152,7 @@ function BufferController(config) {
 
     function onInitFragmentLoaded(e) {
         if (e.fragmentModel !== streamProcessor.getFragmentModel()) return;
-        log('Init fragment finished loading saving to', type + '\'s init cache');
+        log('[' + type + '] Init fragment finished loading saving to', type + '\'s init cache');
         initCache.save(e.chunk);
         appendToBuffer(e.chunk);
     }
@@ -224,10 +224,15 @@ function BufferController(config) {
         }
 
         const ranges = sourceBufferController.getAllRanges(buffer);
+        log('[', type, '] onAppended()');
         if (ranges && ranges.length > 0) {
+            log(' - Ranges present: ', ranges.length);
             for (let i = 0, len = ranges.length; i < len; i++) {
-                log('Buffered Range for type:', type , ':' ,ranges.start(i) ,  ' - ' ,  ranges.end(i));
+                log('[', type, '] - Buffered Range : [ ', ranges.start(i) ,  ' - ' ,  ranges.end(i) , ' ] ' + (ranges.end(i) - ranges.start(i)) + ' currentTime = ' + playbackController.getTime());
             }
+        }
+        else {
+            log('[', type, '] - Buffered Range : (no buffered ranges)');
         }
 
         onPlaybackProgression();
@@ -283,6 +288,7 @@ function BufferController(config) {
     }
 
     function checkIfSufficientBuffer() {
+        //log('[' + type + ']' + ' bufferLevel = ' + bufferLevel + ', bufferState = ' + bufferState + ', currentTime = ' + playbackController.getTime());
         if (bufferLevel < STALL_THRESHOLD && !isBufferingCompleted) {
             notifyBufferStateChanged(BUFFER_EMPTY);
         } else {
@@ -296,7 +302,7 @@ function BufferController(config) {
         addBufferMetrics();
         eventBus.trigger(Events.BUFFER_LEVEL_STATE_CHANGED, {sender: instance, state: state, mediaType: type, streamInfo: streamProcessor.getStreamInfo()});
         eventBus.trigger(state === BUFFER_LOADED ? Events.BUFFER_LOADED : Events.BUFFER_EMPTY, {mediaType: type});
-        log(state === BUFFER_LOADED ? 'Got enough buffer to start.' : 'Waiting for more buffer before starting playback.');
+        log(state === BUFFER_LOADED ? '[' + type + '] Got enough buffer to start.' : '[' + type + '] Waiting for more buffer before starting playback.');
     }
 
 
@@ -387,6 +393,8 @@ function BufferController(config) {
 
         let removeEnd = (req && !isNaN(req.startTime)) ? req.startTime : Math.floor(currentTime);
         if ((range === null) && (buffer.buffered.length > 0)) {
+            // VUDU Rik: Annotating non-obvious code ;)
+            // range === null => req hasn't been put in buffer yet, so set removeEnd to end of MSE buffer instead.
             removeEnd = buffer.buffered.end(buffer.buffered.length - 1 );
         }
 
@@ -426,6 +434,9 @@ function BufferController(config) {
     function onStreamCompleted(e) {
         if (e.fragmentModel !== streamProcessor.getFragmentModel()) return;
         lastIndex = e.request.index;
+
+        log('[',type,'] streamCompleted at index: ', lastIndex);
+
         checkIfBufferingCompleted();
     }
 
