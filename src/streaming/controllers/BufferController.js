@@ -319,7 +319,15 @@ function BufferController(config) {
         if (bufferLevel < STALL_THRESHOLD && !isBufferingCompleted) {
             notifyBufferStateChanged(BUFFER_EMPTY);
         } else {
-            notifyBufferStateChanged(BUFFER_LOADED);
+            if (isBufferingCompleted) {
+                notifyBufferStateChanged(BUFFER_LOADED);
+                return;
+            }
+            //Vudu Eric, after bufferunderrun, only both audio/video accumulate more than 6 seconds then notify new buffered state
+            // FIXME: Shouldn't be a hardcoded '6'.
+            if (bufferLevel >= 6) {
+                notifyBufferStateChanged(BUFFER_LOADED);
+            }
         }
     }
 
