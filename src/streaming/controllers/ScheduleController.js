@@ -281,7 +281,7 @@ function ScheduleController(config) {
         const item = fragmentModel.getRequests({state: FragmentModel.FRAGMENT_MODEL_EXECUTED, time: playbackController.getTime(), threshold: 0})[0];
         if (item && playbackController.getTime() >= item.startTime ) {
             if (item.quality !== lastQualityIndex && trigger) {
-                eventBus.trigger(Events.QUALITY_CHANGE_RENDERED, {mediaType: type, oldQuality: lastQualityIndex, newQuality: item.quality});
+                eventBus.trigger(Events.QUALITY_CHANGE_RENDERED, {mediaType: type, oldQuality: lastQualityIndex, newQuality: item.quality, request: item});
             }
             lastQualityIndex = item.quality;
         }
