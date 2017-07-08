@@ -122,6 +122,7 @@ function ScheduleController(config) {
         scheduleWhilePaused = mediaPlayerModel.getScheduleWhilePaused();
 
         bufferLevelRule = BufferLevelRule(context).create({
+            adapter: DashAdapter(context).getInstance(),
             dashMetrics: DashMetrics(context).getInstance(),
             metricsModel: MetricsModel(context).getInstance(),
             textSourceBuffer: TextSourceBuffer(context).getInstance()
@@ -353,10 +354,42 @@ function ScheduleController(config) {
         if (e.sender.getStreamProcessor() !== streamProcessor) return;
         // after the data has been removed from the buffer we should remove the requests from the list of
         // the executed requests for which playback time is inside the time interval that has been removed from the buffer
-        fragmentModel.removeExecutedRequestsBeforeTime(e.to);
 
-        if (e.hasEnoughSpaceToAppend && !bufferController.getIsBufferingCompleted() && isStopped) {
-            start();
+        // VUDU Rik - Remove executed requests across full buffer, not just in range 0->e.to.
+        streamProcessor.getFragmentModel().syncExecutedRequestsWithBufferedRange(
+            bufferController.getBuffer().buffered,
+            streamProcessor.getStreamInfo().duration);
+
+        // VUDU Rik - Take size of next fragment into account when deciding if there's space to append yet.
+        if (isStopped && !bufferController.getIsBufferingCompleted()) {
+            const bufferLevel = bufferController.getBufferLevel();
+            const bufferSpace = mediaPlayerModel.getBufferAheadToKeep() - bufferLevel;
+            let hasSpace = (e.hasEnoughSpaceToAppend && (bufferLevel < 10)); // basic default
+            log('bufferLevel: ', bufferLevel, '; bufferSpace: ', bufferSpace, '; hasSpace: ', hasSpace);
+
+            // FIXME - must change to use FragmentRequestForTime() rather than getNextFragment
+            const representationInfo = streamProcessor.getCurrentRepresentationInfo();
+            const time = adapter.getIndexHandlerTime(streamProcessor);
+            const request = adapter.getFragmentRequestForTime(streamProcessor, representationInfo, time);
+            if (request && !isNaN(request.duration)) {
+                if (bufferSpace < request.duration) {
+                    // TODO take into account estimated time to download fragment
+                    hasSpace = false;
+                }
+                else {
+                    hasSpace = true;
+                }
+                log('request found -- request.duration:', request.duration, '; bufferSpace: ', bufferSpace, '; hasSpace: ', hasSpace);
+            }
+
+            if (hasSpace) {
+                start();
+            }
+            else {
+                // VUDU Rik - wait a while before resuming to allow buffer to drain.
+                var waitTime = (request && !isNaN(request.duration)) ? request.duration : 5;
+                setTimeout(start, 1000 * waitTime);
+            }
         }
     }
 

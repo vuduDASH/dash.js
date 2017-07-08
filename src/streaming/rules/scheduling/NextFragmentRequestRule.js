@@ -135,6 +135,12 @@ function NextFragmentRequestRule(config) {
                     keepIdx: !hasSeekTarget && !hasTimeAdjusted
                 });
 
+            //Vudu Eric/Rik, this solution is going to sync executed queue with buffer range (to check for silent purge), then go to check if this requested is downloded or not.
+            const bufferedRanges = sourceBufferController.getAllRanges(buffer);
+            const duration = streamProcessor.getStreamInfo().duration;
+            if (bufferedRanges && bufferedRanges.length > 0) {
+                streamProcessor.getFragmentModel().syncExecutedRequestsWithBufferedRange(bufferedRanges, duration);
+            }
             if (request && streamProcessor.getFragmentModel().isFragmentLoaded(request)) {
                 log('[', mediaType, '] NextFragmentRequestRule request.index = ', request.index, ' for time = ', time, ' is already loaded!!');
                 request = adapter.getNextFragmentRequest(streamProcessor, representationInfo);

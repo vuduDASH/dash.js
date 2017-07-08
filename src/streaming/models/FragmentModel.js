@@ -147,8 +147,36 @@ function FragmentModel(config) {
     }
 
     function removeExecutedRequestsBeforeTime(time) {
-        executedRequests = executedRequests.filter( req => isNaN(req.startTime) || req.startTime >= time );
+        executedRequests = executedRequests.filter( req => isNaN(req.startTime) || req.startTime >= time - 0.25);
         //showAllRequestLists('FragmentModel after removeExecutedRequestsBeforeTime(' + time + ')');
+    }
+
+    function removeExecutedRequestsInTimeRange(start, end) {
+        if (end <= start + 0.5) {
+            return;
+        }
+        executedRequests = executedRequests.filter( req => {
+            var result = (isNaN(req.startTime) || req.startTime >= (end - 0.25)) || (isNaN(req.startTime + req.duration) || (req.startTime + req.duration) <= (start + 0.25));
+            //log('[' + req.mediaInfo.type + '] ' + 'req.index = ' + req.index + ' req.startTime = ' + req.startTime + ' req.endTime = ' + (req.startTime + req.duration) + ' result = ' + result );
+            return result;
+        } );
+        //showAllRequestLists('FragmentModel after removeExecutedRequestsInTimeRange(' + start + ',' + end + ')');
+    }
+    //Vudu Eric, if our platform do buffer remove without notify app, we need sync executed queue with what is buffered
+    // This is where this function come into playback.
+    function syncExecutedRequestsWithBufferedRange(bufferdRanges, duration) {
+        if (!bufferdRanges || bufferdRanges.length === 0) {
+            return;
+        }
+        let start = 0;
+        for (let i = 0, ln = bufferdRanges.length; i < ln; i++) {
+            removeExecutedRequestsInTimeRange(start,bufferdRanges.start(i));
+            start = bufferdRanges.end(i);
+        }
+        if (duration) {
+            removeExecutedRequestsInTimeRange(start, duration);
+        }
+        //showAllRequestLists('FragmentModel after syncExecutedRequestsWithBufferedRange() duration = ' + duration);
     }
 
     function abortRequests() {
@@ -284,6 +312,8 @@ function FragmentModel(config) {
         getRequests: getRequests,
         isFragmentLoaded: isFragmentLoaded,
         removeExecutedRequestsBeforeTime: removeExecutedRequestsBeforeTime,
+        removeExecutedRequestsInTimeRange: removeExecutedRequestsInTimeRange,
+        syncExecutedRequestsWithBufferedRange: syncExecutedRequestsWithBufferedRange,
         abortRequests: abortRequests,
         executeRequest: executeRequest,
         reset: reset
