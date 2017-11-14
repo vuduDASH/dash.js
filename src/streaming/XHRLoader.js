@@ -216,9 +216,7 @@ function XHRLoader(cfg) {
             var requestData = {
                 url: (request.url + ''), /*clone*/
                 range: request.range ? (request.range + '') : null, /*clone*/
-                headers: {
-                    Range: 'bytes=' + request.range
-                }
+                headers: request.range ? { Range: 'bytes=' + request.range } : null
             };
             if (!!requestModifier.modifyRequestData) {
                 // New method proposed by VUDU.  Hence doing existance check to protect legacy implementations that will not have modifyRequestData() method.
