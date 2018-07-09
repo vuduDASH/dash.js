@@ -39,6 +39,7 @@ const DEFAULT_LOCAL_STORAGE_MEDIA_SETTINGS_EXPIRATION = 360000;
 
 const BANDWIDTH_SAFETY_FACTOR = 0.9;
 const ABANDON_LOAD_TIMEOUT = 10000;
+const XHR_NETWORK_TIMEOUT = 20000;
 
 const BUFFER_CRITICAL_DEFAULT_LEVEL = Number.POSITIVE_INFINITY;
 const BUFFER_CRITICAL_MINIMUM_LEVEL = 0;
@@ -94,7 +95,8 @@ function MediaPlayerModel() {
         wallclockTimeUpdateInterval,
         bufferOccupancyABREnabled,
         xhrWithCredentials,
-        fastSwitchEnabled;
+        fastSwitchEnabled,
+        xhrNetworkTimeoutForType;
 
     function setup() {
         UTCTimingSources = [];
@@ -121,7 +123,7 @@ function MediaPlayerModel() {
         abandonLoadTimeout = ABANDON_LOAD_TIMEOUT;
         wallclockTimeUpdateInterval = WALLCLOCK_TIME_UPDATE_INTERVAL;
         xhrWithCredentials = DEFAULT_XHR_WITH_CREDENTIALS;
-
+        xhrNetworkTimeoutForType = { audio: XHR_NETWORK_TIMEOUT, video: XHR_NETWORK_TIMEOUT };
 
         retryAttempts = {
             [HTTPRequest.MPD_TYPE]:                         MANIFEST_RETRY_ATTEMPTS,
@@ -376,6 +378,14 @@ function MediaPlayerModel() {
         fastSwitchEnabled = value;
     }
 
+    function getNetworkTimeoutForType(type) {
+        return xhrNetworkTimeoutForType[type];
+    }
+
+    function setNetworkTimeoutForType(type, timeout) {
+        xhrNetworkTimeoutForType[type] = timeout;
+    }
+
     function reset() {
         //TODO need to figure out what props to persist across sessions and which to reset if any.
         //setup();
@@ -438,6 +448,8 @@ function MediaPlayerModel() {
         getXHRWithCredentials: getXHRWithCredentials,
         setFastSwitchEnabled: setFastSwitchEnabled,
         getFastSwitchEnabled: getFastSwitchEnabled,
+        getNetworkTimeoutForType: getNetworkTimeoutForType,
+        setNetworkTimeoutForType: setNetworkTimeoutForType,
         reset: reset
     };
 

@@ -1567,6 +1567,23 @@ function MediaPlayer() {
     }
 
     /**
+     * A timeout value, in milliseconds, used to set maximum time allowed for an XMLHttpRequest to
+     * complete for the XHRLoader module.
+     *
+     * @default 20 seconds
+     * @param {Object} values - hash containing the timeout values to set (e.g, {video: 20000, audio: 10000})
+     */
+    function setXhrNetworkTimeout(values) {
+        if ('number' === typeof values.video) {
+            mediaPlayerModel.setNetworkTimeoutForType('video', values.video);
+        }
+
+        if ('number' === typeof values.audio) {
+            mediaPlayerModel.setNetworkTimeoutForType('audio', values.audio);
+        }
+    }
+
+    /**
      * Total number of retry attempts that will occur on a fragment load before it fails.
      * Increase this value to a maximum in order to achieve an automatic playback resume
      * in case of completely lost internet connection.
@@ -2052,6 +2069,7 @@ function MediaPlayer() {
         setBandwidthSafetyFactor: setBandwidthSafetyFactor,
         getBandwidthSafetyFactor: getBandwidthSafetyFactor,
         setAbandonLoadTimeout: setAbandonLoadTimeout,
+        setXhrNetworkTimeout: setXhrNetworkTimeout,
         retrieveManifest: retrieveManifest,
         addUTCTimingSource: addUTCTimingSource,
         removeUTCTimingSource: removeUTCTimingSource,
