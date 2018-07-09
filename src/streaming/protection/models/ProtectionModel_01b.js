@@ -188,6 +188,14 @@ function ProtectionModel_01b(config) {
         // Replacing the previous element
         if (videoElement) {
             removeEventListeners();
+
+            // VUDU Rik - close any open sessions
+            if (sessions) {
+                for (var i = 0; i < sessions.length; i++) {
+                    closeKeySession(sessions[i]);
+                }
+                sessions = [];
+            }
         }
 
         videoElement = mediaElement;
@@ -260,7 +268,7 @@ function ProtectionModel_01b(config) {
         if (videoElement && sessionToken && sessionToken.sessionID) {
             // Send our request to the CDM
             try {
-                videoElement[api.cancelKeyRequest](this.keySystem.systemString, sessionToken.sessionID);
+                videoElement[api.cancelKeyRequest](keySystem.systemString, sessionToken.sessionID);
             } catch (error) {
                 log('Error: exception inside closekeySession!!');
             }
