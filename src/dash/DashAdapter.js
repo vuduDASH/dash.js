@@ -304,6 +304,11 @@ function DashAdapter() {
         return streamProcessor.getIndexHandler().getNextSegmentRequest(representation);
     }
 
+    function getNextFragmentDuration(streamProcessor, trackInfo) {
+        var representation = getRepresentationForTrackInfo(trackInfo, streamProcessor.getRepresentationController());
+        return streamProcessor.getIndexHandler().getNextSegmentDuration(representation);
+    }
+
     function getFragmentRequestForTime(streamProcessor, trackInfo, time, options) {
         var representation = getRepresentationForTrackInfo(trackInfo, streamProcessor.getRepresentationController());
         return streamProcessor.getIndexHandler().getSegmentRequestForTime(representation, time, options);
@@ -407,6 +412,7 @@ function DashAdapter() {
         updateData: updateData,
         getInitRequest: getInitRequest,
         getNextFragmentRequest: getNextFragmentRequest,
+        getNextFragmentDuration: getNextFragmentDuration,
         getFragmentRequestForTime: getFragmentRequestForTime,
         generateFragmentRequestForTime: generateFragmentRequestForTime,
         getIndexHandlerTime: getIndexHandlerTime,

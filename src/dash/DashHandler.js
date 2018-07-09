@@ -409,6 +409,37 @@ function DashHandler(config) {
         return getSegmentRequestForTime(representation, time, {keepIdx: false, ignoreIsFinished: true});
     }
 
+    function getNextSegmentDuration(representation) {
+        var currentIndex = index;
+        let dur = NaN;
+
+        // Wrap to in try/catch to avoid corruption of index, in case of failure
+        try {
+            // Need to temporarily point to next fragment
+            index++;
+
+            if ( !representation || (index < 0) ) {
+                log('invalid args: ', !representation, ' || ', (index < 0) );
+            }
+            else if (isMediaFinished(representation)) {
+                log('Media finished: no more fragments');
+            }
+            else {
+                updateSegments(representation);
+                const segment = getSegmentByIndex(index, representation);
+                dur = segment.duration;
+            }
+        }
+        catch (err) {
+            log('getNextSegmentDuration threw: ', err.message);
+        }
+
+        // Restore index back to current fragment
+        index = currentIndex;
+
+        return dur;
+    }
+
     function getNextSegmentRequest(representation) {
         var request,
             segment,
@@ -505,6 +536,7 @@ function DashHandler(config) {
         getInitRequest: getInitRequest,
         getSegmentRequestForTime: getSegmentRequestForTime,
         getNextSegmentRequest: getNextSegmentRequest,
+        getNextSegmentDuration: getNextSegmentDuration,
         generateSegmentRequestForTime: generateSegmentRequestForTime,
         updateRepresentation: updateRepresentation,
         setCurrentTime: setCurrentTime,
