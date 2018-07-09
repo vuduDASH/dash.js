@@ -45,8 +45,18 @@ import InitCache from '../utils/InitCache';
 const BUFFER_LOADED = 'bufferLoaded';
 const BUFFER_EMPTY = 'bufferStalled';
 const STALL_THRESHOLD = 0.5;
-//VUDU Rik - removing anything smaller than a frame will fail.  Don't attempt anything smaller than two frames
-const REMOVE_MINIMUM = 2 / 30;
+
+// VUDU Rik - removing anything smaller than a sample will fail.
+// Provide some minimum values.  Audio and video have different
+// sample sizes.
+const FragmentThreshold = {
+    video: 2 / 30,
+    audio: 1 / 8000,
+    default: 2 / 30,
+    getForType: function frag_threshold_getfortype(type) {
+        return ('number' === typeof FragmentThreshold[type]) ? FragmentThreshold[type] : FragmentThreshold.default;
+    }
+};
 
 function BufferController(config) {
 
@@ -276,7 +286,7 @@ function BufferController(config) {
                     let haveRemovableRanges = false;
                     if ( !!ranges && (0 !== ranges.length) ) {
                         haveRemovableRanges = ranges.some(function (item) {
-                            if ( (item.end - item.start) >= REMOVE_MINIMUM ) {
+                            if ( (item.end - item.start) >= FragmentThreshold.getForType(type) ) {
                                 return true;
                             }
                         });
@@ -531,7 +541,7 @@ function BufferController(config) {
         };
 
         // VUDU Rik - add explicit tolerance, to reduce likelihood of pruning wrong fragment.
-        const req = streamProcessor.getFragmentModel().getRequests({state: FragmentModel.FRAGMENT_MODEL_EXECUTED, time: currentTime, threshold: REMOVE_MINIMUM})[0];
+        const req = streamProcessor.getFragmentModel().getRequests({state: FragmentModel.FRAGMENT_MODEL_EXECUTED, time: currentTime, threshold: FragmentThreshold.getForType(type)})[0];
 
         // If the keep range is likely to trim the current fragment, then extend keeprange to include all the current fragment.
         if (!!req) {
@@ -580,7 +590,7 @@ function BufferController(config) {
         // we need to remove data that is more than one fragment before the video currentTime
         const currentTime = playbackController.getTime();
         // VUDU Rik - add explicit tolerance, to reduce likelihood of pruning wrong fragment.
-        const req = streamProcessor.getFragmentModel().getRequests({state: FragmentModel.FRAGMENT_MODEL_EXECUTED, time: currentTime, threshold: REMOVE_MINIMUM})[0];
+        const req = streamProcessor.getFragmentModel().getRequests({state: FragmentModel.FRAGMENT_MODEL_EXECUTED, time: currentTime, threshold: FragmentThreshold.getForType(type)})[0];
         const range = sourceBufferController.getBufferRange(buffer, currentTime);
 
         let removeStart = buffer.buffered.start(0);
