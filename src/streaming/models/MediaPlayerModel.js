@@ -54,6 +54,7 @@ const BUFFER_TIME_AT_TOP_QUALITY = 30;
 const BUFFER_TIME_AT_TOP_QUALITY_LONG_FORM = 60;
 const LONG_FORM_CONTENT_DURATION_THRESHOLD = 600;
 const RICH_BUFFER_THRESHOLD = 20;
+const STARVED_BUFFER_THRESHOLD = 5;
 
 const FRAGMENT_RETRY_ATTEMPTS = 3;
 const FRAGMENT_RETRY_INTERVAL = 1000;
@@ -90,6 +91,7 @@ function MediaPlayerModel() {
         bufferTimeAtTopQualityLongForm,
         longFormContentDurationThreshold,
         richBufferThreshold,
+        starvedBufferThreshold,
         bandwidthSafetyFactor,
         abandonLoadTimeout,
         retryAttempts,
@@ -122,6 +124,7 @@ function MediaPlayerModel() {
         bufferTimeAtTopQualityLongForm = BUFFER_TIME_AT_TOP_QUALITY_LONG_FORM;
         longFormContentDurationThreshold = LONG_FORM_CONTENT_DURATION_THRESHOLD;
         richBufferThreshold = RICH_BUFFER_THRESHOLD;
+        starvedBufferThreshold = STARVED_BUFFER_THRESHOLD;
         bandwidthSafetyFactor = BANDWIDTH_SAFETY_FACTOR;
         abandonLoadTimeout = ABANDON_LOAD_TIMEOUT;
         wallclockTimeUpdateInterval = WALLCLOCK_TIME_UPDATE_INTERVAL;
@@ -215,6 +218,13 @@ function MediaPlayerModel() {
         return richBufferThreshold;
     }
 
+    function setStarvedBufferThreshold(value) {
+        starvedBufferThreshold = value;
+    }
+
+    function getStarvedBufferThreshold() {
+        return starvedBufferThreshold;
+    }
 
     function setBufferToKeep(value) {
         bufferToKeep = value;
@@ -424,6 +434,8 @@ function MediaPlayerModel() {
         getLongFormContentDurationThreshold: getLongFormContentDurationThreshold,
         setRichBufferThreshold: setRichBufferThreshold,
         getRichBufferThreshold: getRichBufferThreshold,
+        setStarvedBufferThreshold: setStarvedBufferThreshold,
+        getStarvedBufferThreshold: getStarvedBufferThreshold,
         setBufferToKeep: setBufferToKeep,
         getBufferToKeep: getBufferToKeep,
         setBufferAheadToKeep: setBufferAheadToKeep,
