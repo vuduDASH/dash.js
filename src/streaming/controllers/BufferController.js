@@ -353,38 +353,43 @@ function BufferController(config) {
         // VUDU RIK - seek may result in a large amount of unnecessary buffered content.
         // remove data outside the play-head range.
 
-        if ('fragmentedText' !== type) {
-            // Remove everything, except the fragment for the playback time
-            const currentTime = playbackController.getTime();
-            const duration = streamProcessor.getStreamInfo().duration;
+        if (mediaPlayerModel.getClearOnSeek()) {
+            if ('fragmentedText' !== type) {
+                // Remove everything, except the fragment for the playback time
+                const currentTime = playbackController.getTime();
+                const duration = streamProcessor.getStreamInfo().duration;
 
-            let req = streamProcessor.getFragmentModel().getRequests({state: FragmentModel.FRAGMENT_MODEL_EXECUTED, time: currentTime})[0];
-            if (!req) {
-                clearBuffer({start: 0, end: duration});
-            }
-            else {
-                let beforeRange = {
-                    start: 0,
-                    end: req.startTime - 0.5
-                };
-
-                let afterRange = {
-                    start: req.starTime + req.duration + 0.5,
-                    end: duration
-                };
-
-                req = streamProcessor.getFragmentModel().getRequests({state: FragmentModel.FRAGMENT_MODEL_EXECUTED, time: req.starTime + req.duration})[0];
-                if (!!req) {
-                    let extendedKeepEnd = req.startTime + req.duration + 0.5;
-                    if ( (extendedKeepEnd - beforeRange.end) < criticalBufferLevel) {
-                        afterRange.start = extendedKeepEnd;
-                    }
+                let req = streamProcessor.getFragmentModel().getRequests({state: FragmentModel.FRAGMENT_MODEL_EXECUTED, time: currentTime, threshold: FragmentThreshold.getForType(type)})[0];
+                if (!req) {
+                    clearBuffer({start: 0, end: duration});
                 }
+                else {
+                    let seekClearRanges = [];
+                    let beforeRange = {
+                        start: 0,
+                        end: Math.max(0, req.startTime - 0.5)
+                    };
 
-                clearBufferRanges([
-                    beforeRange,
-                    afterRange
-                ]);
+                    if (beforeRange.end > beforeRange.start) {
+                        seekClearRanges.push(beforeRange);
+                    }
+
+                    let afterRange = {
+                        start: req.startTime + req.duration + 0.5,
+                        end: duration
+                    };
+
+                    req = streamProcessor.getFragmentModel().getRequests({state: FragmentModel.FRAGMENT_MODEL_EXECUTED, time: req.startTime + req.duration, threshold: FragmentThreshold.getForType(type)})[0];
+                    if (!!req) {
+                        let extendedKeepEnd = req.startTime + req.duration + 0.5;
+                        if ( (extendedKeepEnd - beforeRange.end) < criticalBufferLevel) {
+                            afterRange.start = extendedKeepEnd;
+                        }
+                    }
+
+                    seekClearRanges.push(afterRange);
+                    clearBufferRanges(seekClearRanges);
+                }
             }
         }
 

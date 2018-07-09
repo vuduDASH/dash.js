@@ -40,6 +40,8 @@ const DEFAULT_LOCAL_STORAGE_MEDIA_SETTINGS_EXPIRATION = 360000;
 const BANDWIDTH_SAFETY_FACTOR = 0.9;
 const ABANDON_LOAD_TIMEOUT = 10000;
 const XHR_NETWORK_TIMEOUT = 20000;
+const DEFAULT_CLEAR_ON_SEEK = true;
+
 
 const BUFFER_CRITICAL_DEFAULT_LEVEL = Number.POSITIVE_INFINITY;
 const BUFFER_CRITICAL_MINIMUM_LEVEL = 0;
@@ -96,7 +98,8 @@ function MediaPlayerModel() {
         bufferOccupancyABREnabled,
         xhrWithCredentials,
         fastSwitchEnabled,
-        xhrNetworkTimeoutForType;
+        xhrNetworkTimeoutForType,
+        clearOnSeek;
 
     function setup() {
         UTCTimingSources = [];
@@ -124,6 +127,7 @@ function MediaPlayerModel() {
         wallclockTimeUpdateInterval = WALLCLOCK_TIME_UPDATE_INTERVAL;
         xhrWithCredentials = DEFAULT_XHR_WITH_CREDENTIALS;
         xhrNetworkTimeoutForType = { audio: XHR_NETWORK_TIMEOUT, video: XHR_NETWORK_TIMEOUT };
+        clearOnSeek = DEFAULT_CLEAR_ON_SEEK;
 
         retryAttempts = {
             [HTTPRequest.MPD_TYPE]:                         MANIFEST_RETRY_ATTEMPTS,
@@ -386,6 +390,14 @@ function MediaPlayerModel() {
         xhrNetworkTimeoutForType[type] = timeout;
     }
 
+    function getClearOnSeek() {
+        return clearOnSeek;
+    }
+
+    function setClearOnSeek(value) {
+        clearOnSeek = value;
+    }
+
     function reset() {
         //TODO need to figure out what props to persist across sessions and which to reset if any.
         //setup();
@@ -450,6 +462,8 @@ function MediaPlayerModel() {
         getFastSwitchEnabled: getFastSwitchEnabled,
         getNetworkTimeoutForType: getNetworkTimeoutForType,
         setNetworkTimeoutForType: setNetworkTimeoutForType,
+        getClearOnSeek: getClearOnSeek,
+        setClearOnSeek: setClearOnSeek,
         reset: reset
     };
 

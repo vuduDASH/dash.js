@@ -1987,6 +1987,13 @@ function MediaPlayer() {
         }
     }
 
+    function enableClearDuringSeek() {
+        mediaPlayerModel.setClearOnSeek(true);
+    }
+    function disableClearDuringSeek() {
+        mediaPlayerModel.setClearOnSeek(false);
+    }
+
     instance = {
         initialize: initialize,
         on: on,
@@ -2095,6 +2102,8 @@ function MediaPlayer() {
         displayCaptionsOnTop: displayCaptionsOnTop,
         attachVideoContainer: attachVideoContainer,
         attachTTMLRenderingDiv: attachTTMLRenderingDiv,
+        enableClearDuringSeek: enableClearDuringSeek,
+        disableClearDuringSeek: disableClearDuringSeek,
         reset: reset
     };
 
