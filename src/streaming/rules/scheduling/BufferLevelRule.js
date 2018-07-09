@@ -55,11 +55,12 @@ function BufferLevelRule(config) {
         const bufferTarget = getBufferTarget(streamProcessor, type, videoTrackPresent);
         let extraFragSpace = 0;
         if ( ('audio' === type) || ('video' === type) ) {
-            let representationInfo = streamProcessor.getCurrentRepresentationInfo();
-            let time = adapter.getIndexHandlerTime(streamProcessor);
-            let req = adapter.getFragmentRequestForTime(streamProcessor, representationInfo, time);
-            if (!!req) {
-                extraFragSpace = req.duration;
+            const representationInfo = streamProcessor.getCurrentRepresentationInfo();
+            const fragDur = adapter.getNextFragmentDuration(streamProcessor, representationInfo);
+
+            //log('BufferLevelRule::execute - getNextSegmentDuration: ', fragDur);
+            if (!isNaN(fragDur)) {
+                extraFragSpace = fragDur;
             }
         }
 
